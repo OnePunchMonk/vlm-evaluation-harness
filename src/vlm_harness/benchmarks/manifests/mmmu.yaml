@@ -1,0 +1,60 @@
+name: MMMU
+version: "1.0"
+description: >
+  Massive Multi-discipline Multimodal Understanding benchmark.
+  Tests expert-level perception and reasoning across 30 subjects
+  spanning Art, Business, Science, Medicine, and Engineering.
+taxonomy_category: reasoning
+modality: 2d
+
+source:
+  type: huggingface
+  path: MMMU/MMMU
+  revision: main
+
+splits:
+  - name: validation
+    scorable: true
+  - name: test
+    scorable: false
+
+task_type: multiple_choice
+
+fields:
+  question: question
+  choices: options
+  answer: answer
+  images:
+    - image_1
+    - image_2
+    - image_3
+    - image_4
+    - image_5
+    - image_6
+    - image_7
+  subject: subfield
+
+image_config:
+  max_images: 7
+  placement: before_text
+  missing_strategy: skip
+
+prompt_template: |
+  {question}
+
+  Options:
+  {formatted_choices}
+
+  Answer with the option letter only.
+
+answer_extraction:
+  strategy: first_letter
+  normalize: uppercase
+
+metrics:
+  - type: accuracy
+  - type: accuracy_by_group
+    group_field: subject
+
+few_shot:
+  count: 0

@@ -1,0 +1,57 @@
+name: Winoground
+version: "1.0"
+description: >
+  Cross-modal compositional reasoning. Given two images and two captions,
+  models must match each caption to the correct image. Tests whether models
+  truly understand both modalities simultaneously rather than using
+  shallow statistical patterns.
+taxonomy_category: cross_modal
+modality: cross_modal
+
+source:
+  type: huggingface
+  path: facebook/winoground
+  revision: main
+
+splits:
+  - name: test
+    scorable: true
+
+task_type: multiple_choice
+
+fields:
+  question: null
+  answer: null
+  images:
+    - image_0
+    - image_1
+
+image_config:
+  max_images: 2
+  placement: before_text
+  missing_strategy: error
+
+cross_modal:
+  ablation_modes:
+    - full
+    - text_only
+    - image_only
+  requires_simultaneous: true
+
+prompt_template: |
+  You are given two images (Image 1 and Image 2) and two captions:
+  Caption A: {caption_0}
+  Caption B: {caption_1}
+
+  Which caption correctly describes Image 1?
+  Answer with "A" or "B" only.
+
+answer_extraction:
+  strategy: first_letter
+  normalize: uppercase
+
+metrics:
+  - type: accuracy
+
+few_shot:
+  count: 0

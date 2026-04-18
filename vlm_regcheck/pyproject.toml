@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "vlm-regcheck"
+version = "0.1.0"
+description = "VLM post-training regression evaluation suite"
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.1.0",
+    "transformers>=4.40.0",
+    "datasets>=2.18.0",
+    "Pillow>=10.0.0",
+    "click>=8.0.0",
+    "accelerate>=0.27.0",
+]
+
+[project.optional-dependencies]
+quant = ["bitsandbytes>=0.43.0", "auto-gptq>=0.7.0"]
+dev   = ["pytest", "pytest-cov"]
+
+[project.scripts]
+vlm-regcheck = "vlm_regcheck.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vlm_regcheck*"]

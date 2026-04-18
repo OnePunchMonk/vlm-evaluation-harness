@@ -1,0 +1,46 @@
+name: VQAv2
+version: "1.0"
+description: >
+  Visual Question Answering v2. Open-ended questions about natural images,
+  balanced to reduce language bias. Requires both visual and language understanding.
+taxonomy_category: perception
+modality: 2d
+
+source:
+  type: huggingface
+  path: HuggingFaceM4/VQAv2
+  revision: main
+
+splits:
+  - name: validation
+    scorable: true
+  - name: test
+    scorable: false
+
+task_type: open_ended
+
+fields:
+  question: question
+  answer: multiple_choice_answer
+  images:
+    - image
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+  Answer with a short phrase or single word.
+
+answer_extraction:
+  strategy: exact
+  normalize: vqa
+
+metrics:
+  - type: accuracy
+  - type: f1
+
+few_shot:
+  count: 0

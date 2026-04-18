@@ -1,0 +1,54 @@
+name: ScanQA
+version: "1.0"
+description: >
+  3D scene question answering over ScanNet RGB-D scans.
+  Questions require spatial reasoning about 3D indoor environments,
+  including object location, counts, and spatial relationships.
+taxonomy_category: 3d_vision
+modality: 3d
+
+source:
+  type: huggingface
+  path: nyu-visionx/ScanQA
+  revision: main
+
+splits:
+  - name: validation
+    scorable: true
+  - name: test
+    scorable: false
+
+task_type: open_ended
+
+fields:
+  question: question
+  answer: answers
+  images:
+    - image
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+three_d:
+  depth_maps:
+    - depth_image
+  multi_view: []
+
+prompt_template: |
+  This is an image of a 3D indoor scene.
+
+  {question}
+
+  Answer concisely, focusing on the spatial layout of the scene.
+
+answer_extraction:
+  strategy: exact
+  normalize: vqa
+
+metrics:
+  - type: accuracy
+  - type: f1
+
+few_shot:
+  count: 0
