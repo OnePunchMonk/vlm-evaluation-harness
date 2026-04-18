@@ -1,0 +1,29 @@
+============================================================
+CLIP Zero-Shot Classification — VLM-Harness Quick Test
+============================================================
+
+[1/4] Loading openai/clip-vit-base-patch32 ...
+      Loaded. Parameters: 151,277,313
+
+[2/4] Running zero-shot classification on 5 synthetic samples ...
+  Sample 1: ✓  pred='a red solid color'  (conf=99.35%)
+  Sample 2: ✓  pred='a blue solid color'  (conf=99.55%)
+  Sample 3: ✓  pred='a green solid color'  (conf=99.45%)
+  Sample 4: ✓  pred='a black and white striped pattern'  (conf=100.00%)
+  Sample 5: ✓  pred='an orange colored image'  (conf=99.67%)
+
+[3/4] Computing harness metrics ...
+
+  Accuracy : 100.00%  (5 samples)
+  Token F1 : 1.0000
+
+[4/4] Deleting model weights from cache ...
+  Deleted: models--openai--clip-vit-base-patch32  (1217.7 MB)
+  Total freed: 1217.7 MB
+
+============================================================
+  RESULT: 5/5 correct
+  Accuracy: 100.00%
+============================================================
+
+  All assertions passed.

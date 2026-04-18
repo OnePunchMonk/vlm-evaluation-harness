@@ -1,0 +1,48 @@
+name: POPE
+version: "1.0"
+description: >
+  Polling-based Object Probing Evaluation. Binary yes/no questions
+  about whether specific objects are present in an image.
+  Measures object hallucination in three difficulty tiers:
+  random, popular (common objects), and adversarial.
+taxonomy_category: safety
+modality: 2d
+
+source:
+  type: huggingface
+  path: lmms-lab/POPE
+  revision: main
+
+splits:
+  - name: test
+    scorable: true
+
+task_type: yes_no
+
+fields:
+  question: question
+  answer: label
+  images:
+    - image
+  subject: category
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+  Answer with "Yes" or "No" only.
+
+answer_extraction:
+  strategy: yes_no
+  normalize: lowercase
+
+metrics:
+  - type: accuracy
+  - type: accuracy_by_group
+    group_field: subject
+
+few_shot:
+  count: 0

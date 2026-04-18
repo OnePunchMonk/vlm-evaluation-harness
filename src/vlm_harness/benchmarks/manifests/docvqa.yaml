@@ -1,0 +1,46 @@
+name: DocVQA
+version: "1.0"
+description: >
+  Document Visual Question Answering. Questions about scanned documents,
+  forms, tables, and other text-rich images.
+taxonomy_category: reasoning
+modality: 2d
+
+source:
+  type: huggingface
+  path: HuggingFaceM4/DocVQA
+  revision: main
+
+splits:
+  - name: validation
+    scorable: true
+  - name: test
+    scorable: false
+
+task_type: open_ended
+
+fields:
+  question: question
+  answer: answers
+  images:
+    - image
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+  Answer based on the document. Be concise.
+
+answer_extraction:
+  strategy: exact
+  normalize: strip
+
+metrics:
+  - type: anls
+  - type: f1
+
+few_shot:
+  count: 0

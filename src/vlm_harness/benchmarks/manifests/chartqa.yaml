@@ -1,0 +1,44 @@
+name: ChartQA
+version: "1.0"
+description: >
+  Chart Question Answering. Questions about charts and plots requiring
+  data extraction, trend identification, and numerical reasoning.
+taxonomy_category: reasoning
+modality: 2d
+
+source:
+  type: huggingface
+  path: HuggingFaceM4/ChartQA
+  revision: main
+
+splits:
+  - name: test
+    scorable: true
+
+task_type: open_ended
+
+fields:
+  question: query
+  answer: label
+  images:
+    - image
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+  Answer concisely. For numerical answers, give only the number.
+
+answer_extraction:
+  strategy: exact
+  normalize: strip
+
+metrics:
+  - type: accuracy
+  - type: f1
+
+few_shot:
+  count: 0

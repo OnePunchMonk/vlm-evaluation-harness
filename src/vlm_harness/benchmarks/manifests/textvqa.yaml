@@ -1,0 +1,46 @@
+name: TextVQA
+version: "1.0"
+description: >
+  Text Visual QA. Questions requiring reading and understanding text
+  visible within natural images.
+taxonomy_category: perception
+modality: 2d
+
+source:
+  type: huggingface
+  path: facebook/textvqa
+  revision: main
+
+splits:
+  - name: validation
+    scorable: true
+  - name: test
+    scorable: false
+
+task_type: open_ended
+
+fields:
+  question: question
+  answer: answers
+  images:
+    - image
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+  Answer with a short phrase based on the text in the image.
+
+answer_extraction:
+  strategy: exact
+  normalize: vqa
+
+metrics:
+  - type: accuracy
+  - type: f1
+
+few_shot:
+  count: 0
