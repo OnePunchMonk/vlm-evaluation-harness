@@ -1,15 +1,22 @@
 """Tests for adapter registry."""
 
 import pytest
-from vlm_harness.adapters.registry import list_adapters, get_adapter
+
+from vlm_harness.adapters.registry import get_adapter, list_adapters
 
 
 def test_list_adapters_returns_dict():
     adapters = list_adapters()
     assert isinstance(adapters, dict)
+    assert "mock" in adapters
     assert "anthropic" in adapters
     assert "openai" in adapters
     assert "huggingface" in adapters
+
+
+def test_mock_adapter_resolves_without_any_extras():
+    adapter = get_adapter("mock:demo-v1")
+    assert adapter.model_id == "demo-v1"
 
 
 def test_invalid_spec_raises():

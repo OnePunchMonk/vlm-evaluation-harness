@@ -1,0 +1,12 @@
+{"id": "geneval_00", "prompt": "a photo of one red circle on a plain background", "checks": {"count": 1, "color": "red", "shape": "circle"}, "category": "compositional"}
+{"id": "geneval_01", "prompt": "a photo of two blue squares on a plain background", "checks": {"count": 2, "color": "blue", "shape": "square"}, "category": "compositional"}
+{"id": "geneval_02", "prompt": "a photo of three green circles on a plain background", "checks": {"count": 3, "color": "green", "shape": "circle"}, "category": "compositional"}
+{"id": "geneval_03", "prompt": "a photo of one purple triangle on a plain background", "checks": {"count": 1, "color": "purple", "shape": "triangle"}, "category": "compositional"}
+{"id": "geneval_04", "prompt": "a photo of four orange squares on a plain background", "checks": {"count": 4, "color": "orange", "shape": "square"}, "category": "compositional"}
+{"id": "geneval_05", "prompt": "a photo of two yellow circles on a plain background", "checks": {"count": 2, "color": "yellow", "shape": "circle"}, "category": "compositional"}
+{"id": "geneval_06", "prompt": "a photo of three black triangles on a plain background", "checks": {"count": 3, "color": "black", "shape": "triangle"}, "category": "compositional"}
+{"id": "geneval_07", "prompt": "a photo of one white square on a plain background", "checks": {"count": 1, "color": "white", "shape": "square"}, "category": "compositional"}
+{"id": "geneval_08", "prompt": "a photo of two red triangles on a plain background", "checks": {"count": 2, "color": "red", "shape": "triangle"}, "category": "compositional"}
+{"id": "geneval_09", "prompt": "a photo of three blue circles on a plain background", "checks": {"count": 3, "color": "blue", "shape": "circle"}, "category": "compositional"}
+{"id": "geneval_10", "prompt": "a photo of one green square on a plain background", "checks": {"count": 1, "color": "green", "shape": "square"}, "category": "compositional"}
+{"id": "geneval_11", "prompt": "a photo of four purple circles on a plain background", "checks": {"count": 4, "color": "purple", "shape": "circle"}, "category": "compositional"}
