@@ -1,0 +1,39 @@
+name: GenJudgeMini
+version: "1.0"
+description: >
+  Zero-dependency generative benchmark: same open-ended prompt set as
+  ClipScoreMini, scored purely via LLM/VLM-as-judge (no CLIP/torch needed).
+  Pairs with the mock T2I adapter and the mock judge for a fully offline
+  demo of the generative eval + regression-tracking pipeline.
+taxonomy_category: generative
+modality: text_to_image
+
+source:
+  type: local
+  path: ../fixtures/clipscore_mini
+
+splits:
+  - name: prompts
+    scorable: true
+
+task_type: text_to_image
+
+fields:
+  question: prompt
+  answer: null
+  metadata_fields:
+    - category
+
+image_config:
+  max_images: 0
+
+metrics:
+  - type: llm_judge
+    judge_model: "mock:judge-v1"
+    rubric: |
+      Rate how well the generated image matches the prompt on a scale of
+      1-10, considering subject fidelity, style, and composition.
+    max_score: 10
+
+few_shot:
+  count: 0
