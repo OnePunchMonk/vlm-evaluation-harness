@@ -1,0 +1,38 @@
+name: GenEvalMini
+version: "1.0"
+description: >
+  Minimal compositional text-to-image benchmark, GenEval-style: each prompt
+  asks for a specific count/color/shape combination, and the metric checks
+  whether the generated image actually contains it (via lightweight CLIP
+  zero-shot presence checks). Fully offline data — pairs with the mock T2I
+  adapter for a zero-dependency demo, and with real backends for real runs.
+taxonomy_category: generative
+modality: text_to_image
+
+source:
+  type: local
+  path: ../fixtures/geneval_mini
+
+splits:
+  - name: prompts
+    scorable: true
+
+task_type: text_to_image
+
+fields:
+  question: prompt
+  answer: null
+  metadata_fields:
+    - checks
+    - category
+
+image_config:
+  max_images: 0
+
+metrics:
+  - type: geneval_clip
+    checks_field: checks
+  - type: clip_score
+
+few_shot:
+  count: 0

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from vlm_harness.adapters.base import VLMAdapter
 
-
 _PROVIDERS: dict[str, str] = {
+    "mock": "vlm_harness.adapters.mock.MockAdapter",
     "anthropic": "vlm_harness.adapters.anthropic.AnthropicAdapter",
     "openai": "vlm_harness.adapters.openai.OpenAIAdapter",
     "google": "vlm_harness.adapters.google.GoogleAdapter",

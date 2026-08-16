@@ -33,6 +33,15 @@ ollama = ["ollama>=0.2.0"]
 litellm = ["litellm>=1.40.0"]
 lm-eval = ["lm-eval>=0.4.0"]
 metrics = ["rouge-score>=0.1.2", "nltk>=3.8", "sacrebleu>=2.4.0"]
+# Generative (text-to-image) support: local diffusers backend + CLIPScore /
+# GenEval-approximation / FID metrics. The mock T2I adapter needs none of this.
+generative = [
+    "torch>=2.0.0",
+    "torchvision>=0.18.0",
+    "transformers>=4.40.0",
+    "diffusers>=0.27.0",
+    "scipy>=1.10.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
@@ -41,7 +50,7 @@ dev = [
     "mypy>=1.10.0",
 ]
 all = [
-    "vlm-harness[anthropic,openai,google,huggingface,metrics,lm-eval]",
+    "vlm-harness[anthropic,openai,google,huggingface,metrics,lm-eval,generative]",
 ]
 
 [project.scripts]

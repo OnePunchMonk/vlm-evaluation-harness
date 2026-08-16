@@ -29,6 +29,11 @@ class FieldsConfig:
     subject: str | None = None
     difficulty: str | None = None
     context: str | None = None
+    # Generic passthrough: arbitrary dataset columns copied verbatim into
+    # sample.metadata, keyed by their own column name. Used by generative
+    # benchmarks to carry structured compositional checks (count/color/shape)
+    # alongside the prompt.
+    metadata_fields: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -62,6 +67,10 @@ class MetricConfig:
     rubric: str | None = None
     max_score: float = 10.0
     tolerance: float = 0.05
+    # Generative-metric knobs (clip_score, geneval_clip, fid, llm_judge over images)
+    clip_model_id: str | None = None
+    checks_field: str | None = None
+    reference_dir: str | None = None
 
 
 @dataclass
@@ -115,6 +124,7 @@ class BenchmarkManifest:
             subject=fields_data.get("subject"),
             difficulty=fields_data.get("difficulty"),
             context=fields_data.get("context"),
+            metadata_fields=fields_data.get("metadata_fields", []),
         )
 
         img_data = data.get("image_config", {})
@@ -148,6 +158,9 @@ class BenchmarkManifest:
                 rubric=m.get("rubric"),
                 max_score=m.get("max_score", 10.0),
                 tolerance=m.get("tolerance", 0.05),
+                clip_model_id=m.get("clip_model_id"),
+                checks_field=m.get("checks_field"),
+                reference_dir=m.get("reference_dir"),
             )
             for m in data.get("metrics", [{"type": "accuracy"}])
         ]
