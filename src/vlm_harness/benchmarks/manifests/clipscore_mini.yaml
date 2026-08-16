@@ -1,0 +1,39 @@
+name: ClipScoreMini
+version: "1.0"
+description: >
+  Minimal open-ended text-to-image prompt set with no ground truth: scored
+  purely by prompt-image alignment (CLIPScore) and, optionally, an
+  LLM/VLM-as-judge rubric. Fully offline data.
+taxonomy_category: generative
+modality: text_to_image
+
+source:
+  type: local
+  path: ../fixtures/clipscore_mini
+
+splits:
+  - name: prompts
+    scorable: true
+
+task_type: text_to_image
+
+fields:
+  question: prompt
+  answer: null
+  metadata_fields:
+    - category
+
+image_config:
+  max_images: 0
+
+metrics:
+  - type: clip_score
+  - type: llm_judge
+    judge_model: "mock:judge-v1"
+    rubric: |
+      Rate how well the generated image matches the prompt on a scale of
+      1-10, considering subject fidelity, style, and composition.
+    max_score: 10
+
+few_shot:
+  count: 0

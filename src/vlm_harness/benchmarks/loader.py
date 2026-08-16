@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
-from vlm_harness.benchmarks.schema import BenchmarkManifest, SplitConfig
+from vlm_harness.benchmarks.schema import BenchmarkManifest
 
 _CACHE_DIR = Path.home() / ".vlm-harness" / "cache"
 
@@ -95,6 +96,9 @@ class BenchmarkLoader:
                 metadata["subject"] = row[fields.subject]
             if fields.difficulty and fields.difficulty in row:
                 metadata["difficulty"] = row[fields.difficulty]
+            for name in fields.metadata_fields:
+                if name in row:
+                    metadata[name] = row[name]
 
             yield BenchmarkSample(
                 sample_id=f"{manifest.name}_{split}_{idx}",
@@ -125,14 +129,21 @@ class BenchmarkLoader:
                 rows = json.load(f)
 
         for idx, row in enumerate(rows[:max_samples]):
-            images = self._extract_images(row, fields.images)
+            images = self._extract_images(row, fields.images, base_dir=data_path)
             text_fields = {
                 "question": row.get(fields.question, ""),
                 "choices": row.get(fields.choices) if fields.choices else None,
                 "context": row.get(fields.context) if fields.context else None,
             }
             answer = str(row.get(fields.answer, "")) if fields.answer else None
-            metadata = {k: row[k] for k in (fields.subject, fields.difficulty) if k and k in row}
+            metadata = {}
+            if fields.subject and fields.subject in row:
+                metadata["subject"] = row[fields.subject]
+            if fields.difficulty and fields.difficulty in row:
+                metadata["difficulty"] = row[fields.difficulty]
+            for name in fields.metadata_fields:
+                if name in row:
+                    metadata[name] = row[name]
 
             yield BenchmarkSample(
                 sample_id=row.get("id", f"{manifest.name}_{split}_{idx}"),
@@ -142,7 +153,9 @@ class BenchmarkLoader:
                 metadata=metadata,
             )
 
-    def _extract_images(self, row: dict, image_fields: list[str]) -> list:
+    def _extract_images(
+        self, row: dict, image_fields: list[str], base_dir: Path | None = None
+    ) -> list:
         images = []
         for field_name in image_fields:
             val = row.get(field_name)
@@ -154,6 +167,8 @@ class BenchmarkLoader:
                 images.append(val)
             elif isinstance(val, (str, Path)):
                 p = Path(val)
+                if not p.is_absolute() and base_dir is not None:
+                    p = base_dir / p
                 if p.exists():
                     images.append(Image.open(p))
             elif isinstance(val, bytes):

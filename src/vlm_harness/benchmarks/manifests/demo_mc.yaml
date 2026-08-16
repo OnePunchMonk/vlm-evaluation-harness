@@ -1,0 +1,50 @@
+name: DemoMC
+version: "1.0"
+description: >
+  Fully offline multiple-choice smoke-test benchmark: identify the color of
+  a rendered square. No network access or API keys required — pairs with
+  the mock adapter to prove the discriminative eval pipeline end to end.
+taxonomy_category: perception
+modality: 2d
+
+source:
+  type: local
+  path: ../fixtures/demo_mc
+
+splits:
+  - name: validation
+    scorable: true
+
+task_type: multiple_choice
+
+fields:
+  question: question
+  choices: choices
+  answer: answer
+  images:
+    - image
+  subject: category
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+  Options:
+  {formatted_choices}
+
+  Answer with the option letter only.
+
+answer_extraction:
+  strategy: first_letter
+  normalize: uppercase
+
+metrics:
+  - type: accuracy
+  - type: accuracy_by_group
+    group_field: subject
+
+few_shot:
+  count: 0

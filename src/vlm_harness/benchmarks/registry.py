@@ -40,7 +40,10 @@ class BenchmarkRegistry:
     def _load_file(self, path: Path) -> BenchmarkManifest:
         with open(path) as f:
             data = yaml.safe_load(f)
-        return BenchmarkManifest.from_dict(data)
+        manifest = BenchmarkManifest.from_dict(data)
+        if manifest.source.type == "local" and not Path(manifest.source.path).is_absolute():
+            manifest.source.path = str((path.parent / manifest.source.path).resolve())
+        return manifest
 
     def get(self, name: str) -> BenchmarkManifest:
         key = name.lower().replace(" ", "_").replace("-", "_")
