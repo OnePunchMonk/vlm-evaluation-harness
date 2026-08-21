@@ -1,3 +1,3 @@
-from vlm_harness.engine.runner import EvalRunner, EvalConfig, EvalResult
+from vlm_harness.engine.runner import EvalConfig, EvalResult, EvalRunner
 
 __all__ = ["EvalRunner", "EvalConfig", "EvalResult"]

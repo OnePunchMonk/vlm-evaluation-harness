@@ -10,6 +10,7 @@ _SEVERITY_EMOJI = {
     "LOW": "🔵",
     "MINIMAL": "⚪",
     "OK": "✅",
+    "NOT_SIGNIFICANT": "⚪",
 }
 
 

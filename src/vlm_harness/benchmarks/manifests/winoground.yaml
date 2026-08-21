@@ -1,10 +1,14 @@
 name: Winoground
-version: "1.0"
+version: "1.1"
 description: >
   Cross-modal compositional reasoning. Given two images and two captions,
   models must match each caption to the correct image. Tests whether models
   truly understand both modalities simultaneously rather than using
   shallow statistical patterns.
+
+  Each sample is asked with two prompts — one about each image — and only
+  counts as a pair-level success if the model gets both right, per the
+  original Winoground protocol. See `pairwise_group` in metrics.
 taxonomy_category: cross_modal
 modality: cross_modal
 
@@ -17,26 +21,26 @@ splits:
   - name: test
     scorable: true
 
-task_type: multiple_choice
+task_type: pairwise_matching
 
 fields:
+  # Winoground has no single "question"/"answer" column — both captions are
+  # exposed to the prompt template via text_fields, and the correct letter
+  # for each prompt is structural (declared below in pairwise_answers), not
+  # read from the dataset.
   question: null
   answer: null
   images:
     - image_0
     - image_1
+  text_fields:
+    caption_0: caption_0
+    caption_1: caption_1
 
 image_config:
   max_images: 2
   placement: before_text
   missing_strategy: error
-
-cross_modal:
-  ablation_modes:
-    - full
-    - text_only
-    - image_only
-  requires_simultaneous: true
 
 prompt_template: |
   You are given two images (Image 1 and Image 2) and two captions:
@@ -46,12 +50,26 @@ prompt_template: |
   Which caption correctly describes Image 1?
   Answer with "A" or "B" only.
 
+prompt_template_b: |
+  You are given two images (Image 1 and Image 2) and two captions:
+  Caption A: {caption_0}
+  Caption B: {caption_1}
+
+  Which caption correctly describes Image 2?
+  Answer with "A" or "B" only.
+
+# prompt_template asks about Image 1 (correct answer: Caption A -> "A").
+# prompt_template_b asks about Image 2 (correct answer: Caption B -> "B").
+pairwise_answers:
+  - "A"
+  - "B"
+
 answer_extraction:
   strategy: first_letter
   normalize: uppercase
 
 metrics:
-  - type: accuracy
+  - type: pairwise_group
 
 few_shot:
   count: 0

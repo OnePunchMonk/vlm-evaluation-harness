@@ -21,7 +21,7 @@ task_type: open_ended
 
 fields:
   question: question
-  answer: answers
+  answers: answers
   images:
     - image
 

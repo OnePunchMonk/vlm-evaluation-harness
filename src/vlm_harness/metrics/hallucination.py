@@ -1,12 +1,16 @@
-"""Hallucination metrics: CHAIR and POPE."""
+"""Hallucination metrics: POPE and CHAIR.
+
+Both are dispatchable from a manifest (`type: pope`, `type: chair`). POPE in
+particular reports **yes_rate**, which is the number that actually matters: a
+model that answers "yes" to every object-presence probe scores ~50% accuracy
+and looks unremarkable, while its yes_rate of 1.0 exposes it immediately.
+"""
 
 from __future__ import annotations
 
 import re
-from collections import defaultdict
 
-from vlm_harness.metrics.base import MetricResult
-
+from vlm_harness.metrics.base import NAN, MetricResult, ScoredSample
 
 # COCO object categories (80 classes) for CHAIR
 COCO_OBJECTS = {
@@ -25,89 +29,40 @@ COCO_OBJECTS = {
 }
 
 
-class CHAIRMetric:
-    """
-    Caption Hallucination Assessment with Image Relevance.
-
-    Measures the fraction of COCO objects mentioned in captions that are
-    not present in the ground-truth annotations.
-    """
-
-    def compute(
-        self,
-        predictions: list[str],
-        references: list[list[str]],  # per-sample list of ground-truth object labels
-        metadata: list[dict],
-    ) -> MetricResult:
-        """
-        Args:
-            predictions: generated captions
-            references: list of ground-truth object sets per sample
-        """
-        chair_s_scores = []  # per-sentence: fraction of objects hallucinated
-        chair_i_scores = []  # per-image: 1 if any hallucination, else 0
-
-        for caption, gt_objects in zip(predictions, references):
-            mentioned = self._extract_objects(caption)
-            gt_set = {o.lower() for o in gt_objects}
-            if not mentioned:
-                chair_s_scores.append(0.0)
-                chair_i_scores.append(0.0)
-                continue
-            hallucinated = [o for o in mentioned if o not in gt_set]
-            chair_s = len(hallucinated) / len(mentioned)
-            chair_i = 1.0 if hallucinated else 0.0
-            chair_s_scores.append(chair_s)
-            chair_i_scores.append(chair_i)
-
-        return MetricResult(
-            metric_name="chair",
-            value=sum(chair_s_scores) / len(chair_s_scores) if chair_s_scores else 0.0,
-            breakdown={
-                "chair_s": sum(chair_s_scores) / len(chair_s_scores) if chair_s_scores else 0.0,
-                "chair_i": sum(chair_i_scores) / len(chair_i_scores) if chair_i_scores else 0.0,
-            },
-            n_samples=len(predictions),
-        )
-
-    def _extract_objects(self, text: str) -> list[str]:
-        """Find COCO object names mentioned in text."""
-        text_lower = text.lower()
-        found = []
-        for obj in COCO_OBJECTS:
-            # Use word boundary matching for multi-word objects
-            pattern = r"\b" + re.escape(obj) + r"\b"
-            if re.search(pattern, text_lower):
-                found.append(obj)
-        return found
-
-
 class POPEMetric:
-    """
-    Polling-based Object Probing Evaluation.
+    """Polling-based Object Probing Evaluation over binary yes/no probes."""
 
-    For binary yes/no questions about object presence.
-    Computes accuracy, precision, recall, and F1.
-    """
+    def compute(self, samples: list[ScoredSample]) -> MetricResult:
+        scorable = [s for s in samples if s.has_reference]
+        if not scorable:
+            return MetricResult(
+                metric_name="pope", value=NAN, n_samples=len(samples), n_scored=0
+            )
 
-    def compute(
-        self,
-        predictions: list[str],
-        references: list[str],  # "yes" or "no"
-        metadata: list[dict],
-    ) -> MetricResult:
-        normalized_preds = [self._normalize(p) for p in predictions]
-        normalized_refs = [r.lower().strip() for r in references]
+        per_sample: dict[str, float] = {}
+        tp = fp = tn = fn = 0
+        yes_predictions = 0
 
-        tp = sum(p == "yes" and r == "yes" for p, r in zip(normalized_preds, normalized_refs))
-        fp = sum(p == "yes" and r == "no" for p, r in zip(normalized_preds, normalized_refs))
-        tn = sum(p == "no" and r == "no" for p, r in zip(normalized_preds, normalized_refs))
-        fn = sum(p == "no" and r == "yes" for p, r in zip(normalized_preds, normalized_refs))
+        for s in scorable:
+            pred = self._normalize(s.prediction)
+            refs = {self._normalize(r) for r in s.references}
+            ref = "yes" if "yes" in refs else "no"
+            per_sample[s.sample_id] = 1.0 if pred == ref else 0.0
+            yes_predictions += pred == "yes"
+            if pred == "yes" and ref == "yes":
+                tp += 1
+            elif pred == "yes":
+                fp += 1
+            elif ref == "no":
+                tn += 1
+            else:
+                fn += 1
 
-        accuracy = (tp + tn) / len(predictions) if predictions else 0.0
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        n = len(scorable)
+        accuracy = (tp + tn) / n
+        precision = tp / (tp + fp) if (tp + fp) else 0.0
+        recall = tp / (tp + fn) if (tp + fn) else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
 
         return MetricResult(
             metric_name="pope",
@@ -117,9 +72,11 @@ class POPEMetric:
                 "precision": precision,
                 "recall": recall,
                 "f1": f1,
-                "yes_rate": sum(p == "yes" for p in normalized_preds) / len(predictions),
+                "yes_rate": yes_predictions / n,
             },
-            n_samples=len(predictions),
+            n_samples=len(samples),
+            n_scored=n,
+            per_sample=per_sample,
         )
 
     def _normalize(self, text: str) -> str:
@@ -128,5 +85,59 @@ class POPEMetric:
             return "yes"
         if re.search(r"\bno\b", lower):
             return "no"
-        # Fallback: treat as yes if first word is positive
         return "yes" if lower.startswith("y") else "no"
+
+
+class CHAIRMetric:
+    """Caption Hallucination Assessment with Image Relevance.
+
+    Ground-truth object labels are read from the sample's metadata under
+    `objects_field`, which the manifest must declare via
+    `fields.metadata_fields`.
+    """
+
+    def __init__(self, objects_field: str = "objects"):
+        self._objects_field = objects_field
+
+    def compute(self, samples: list[ScoredSample]) -> MetricResult:
+        usable = [s for s in samples if self._objects_field in s.metadata]
+        if not usable:
+            return MetricResult(
+                metric_name="chair", value=NAN, n_samples=len(samples), n_scored=0
+            )
+
+        per_sample: dict[str, float] = {}
+        chair_i_scores: list[float] = []
+
+        for s in usable:
+            mentioned = self.extract_objects(s.prediction)
+            gt = {str(o).lower() for o in (s.metadata.get(self._objects_field) or [])}
+            if not mentioned:
+                per_sample[s.sample_id] = 0.0
+                chair_i_scores.append(0.0)
+                continue
+            hallucinated = [o for o in mentioned if o not in gt]
+            per_sample[s.sample_id] = len(hallucinated) / len(mentioned)
+            chair_i_scores.append(1.0 if hallucinated else 0.0)
+
+        chair_s = sum(per_sample.values()) / len(per_sample)
+        return MetricResult(
+            metric_name="chair",
+            value=chair_s,
+            breakdown={
+                "chair_s": chair_s,
+                "chair_i": sum(chair_i_scores) / len(chair_i_scores),
+            },
+            n_samples=len(samples),
+            n_scored=len(usable),
+            per_sample=per_sample,
+        )
+
+    def extract_objects(self, text: str) -> list[str]:
+        """Find COCO object names mentioned in text."""
+        text_lower = text.lower()
+        return [
+            obj
+            for obj in sorted(COCO_OBJECTS)
+            if re.search(r"\b" + re.escape(obj) + r"\b", text_lower)
+        ]

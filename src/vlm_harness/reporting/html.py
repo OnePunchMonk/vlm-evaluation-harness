@@ -18,6 +18,7 @@ _SEVERITY_COLOR = {
     "LOW": "#88aaff",
     "MINIMAL": "#cccccc",
     "OK": "#44bb44",
+    "NOT_SIGNIFICANT": "#cccccc",
 }
 
 _STYLE = """

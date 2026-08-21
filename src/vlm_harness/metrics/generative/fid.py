@@ -93,5 +93,6 @@ class FIDMetric:
             metric_name="fid",
             value=fid,
             n_samples=len(images),
+            n_scored=len(images),
             metadata={"n_reference": len(ref_images)},
         )

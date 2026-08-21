@@ -1,7 +1,8 @@
 """Tests for the benchmark registry."""
 
 import pytest
-from vlm_harness.benchmarks.registry import BenchmarkRegistry, get_registry
+
+from vlm_harness.benchmarks.registry import BenchmarkRegistry
 
 
 def test_registry_loads_builtins():
@@ -53,5 +54,6 @@ def test_cross_modal_benchmark_loaded():
     registry = BenchmarkRegistry()
     manifest = registry.get("winoground")
     assert manifest.modality == "cross_modal"
-    assert manifest.cross_modal is not None
-    assert manifest.cross_modal.requires_simultaneous is True
+    assert manifest.task_type == "pairwise_matching"
+    assert manifest.prompt_template_b is not None
+    assert manifest.pairwise_answers == ["A", "B"]

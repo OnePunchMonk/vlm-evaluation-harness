@@ -1,22 +1,34 @@
-"""Benchmark registry: discover and load YAML benchmark manifests."""
+"""Benchmark registry: discover, validate, and load YAML benchmark manifests."""
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import yaml
 
-from vlm_harness.benchmarks.schema import BenchmarkManifest
+from vlm_harness.benchmarks.schema import BenchmarkManifest, ManifestError
 
 # Built-in manifests shipped with the package
 _BUILTIN_DIR = Path(__file__).parent / "manifests"
 
 
+def _normalize_key(name: str) -> str:
+    return name.lower().replace(" ", "_").replace("-", "_")
+
+
 class BenchmarkRegistry:
-    """Discovers, loads, and validates benchmark manifests."""
+    """Discovers, loads, and validates benchmark manifests.
+
+    Manifests that fail validation are *not* silently skipped: the failure is
+    retained and re-raised when that benchmark is requested, and reported by
+    `errors()` so CI can assert the shipped set is clean.
+    """
 
     def __init__(self, extra_dirs: list[Path] | None = None):
         self._manifests: dict[str, BenchmarkManifest] = {}
+        self._hashes: dict[str, str] = {}
+        self._errors: dict[str, str] = {}
         search_dirs = [_BUILTIN_DIR]
         if extra_dirs:
             search_dirs.extend(extra_dirs)
@@ -28,56 +40,55 @@ class BenchmarkRegistry:
             return
         for yaml_file in sorted(directory.glob("*.yaml")):
             try:
-                manifest = self._load_file(yaml_file)
-                key = manifest.name.lower().replace(" ", "_").replace("-", "_")
-                self._manifests[key] = manifest
-                # Also register by filename stem
-                self._manifests[yaml_file.stem.lower()] = manifest
+                manifest, digest = self._load_file(yaml_file)
             except Exception as e:
-                import warnings
-                warnings.warn(f"Failed to load benchmark manifest {yaml_file}: {e}")
+                self._errors[yaml_file.stem.lower()] = str(e)
+                continue
+            for key in {_normalize_key(manifest.name), yaml_file.stem.lower()}:
+                self._manifests[key] = manifest
+                self._hashes[key] = digest
 
-    def _load_file(self, path: Path) -> BenchmarkManifest:
-        with open(path) as f:
-            data = yaml.safe_load(f)
+    def _load_file(self, path: Path) -> tuple[BenchmarkManifest, str]:
+        raw = path.read_bytes()
+        data = yaml.safe_load(raw)
         manifest = BenchmarkManifest.from_dict(data)
         if manifest.source.type == "local" and not Path(manifest.source.path).is_absolute():
             manifest.source.path = str((path.parent / manifest.source.path).resolve())
-        return manifest
+        manifest.validate()
+        return manifest, hashlib.sha256(raw).hexdigest()[:16]
 
     def get(self, name: str) -> BenchmarkManifest:
-        key = name.lower().replace(" ", "_").replace("-", "_")
-        if key not in self._manifests:
-            available = sorted(set(self._manifests.keys()))
-            raise KeyError(
-                f"Benchmark '{name}' not found. Available: {available}"
+        key = _normalize_key(name)
+        if key in self._manifests:
+            return self._manifests[key]
+        if key in self._errors:
+            raise ManifestError(
+                f"Benchmark '{name}' failed validation and cannot be run:\n{self._errors[key]}"
             )
-        return self._manifests[key]
+        available = sorted(set(self._manifests.keys()))
+        raise KeyError(f"Benchmark '{name}' not found. Available: {available}")
+
+    def manifest_hash(self, name: str) -> str:
+        """Content hash of the manifest file, recorded in results for provenance."""
+        return self._hashes.get(_normalize_key(name), "")
+
+    def errors(self) -> dict[str, str]:
+        """Manifests that failed to load or validate, keyed by filename stem."""
+        return dict(self._errors)
 
     def list(self) -> list[str]:
         """Return unique benchmark names (deduplicated)."""
-        seen: set[str] = set()
-        result = []
-        for manifest in self._manifests.values():
-            if manifest.name not in seen:
-                seen.add(manifest.name)
-                result.append(manifest.name)
-        return sorted(result)
+        return sorted({m.name for m in self._manifests.values()})
 
     def list_by_category(self) -> dict[str, list[str]]:
         """Return benchmark names grouped by taxonomy category."""
         categories: dict[str, list[str]] = {}
-        seen: set[str] = set()
-        for manifest in self._manifests.values():
-            if manifest.name in seen:
-                continue
-            seen.add(manifest.name)
-            cat = manifest.taxonomy_category
-            categories.setdefault(cat, []).append(manifest.name)
+        for manifest in {m.name: m for m in self._manifests.values()}.values():
+            categories.setdefault(manifest.taxonomy_category, []).append(manifest.name)
         return {k: sorted(v) for k, v in sorted(categories.items())}
 
     def __len__(self) -> int:
-        return len(set(m.name for m in self._manifests.values()))
+        return len({m.name for m in self._manifests.values()})
 
 
 # Module-level singleton
