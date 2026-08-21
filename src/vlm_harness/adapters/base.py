@@ -17,11 +17,52 @@ class VLMResponse:
     output_tokens: int = 0
     latency_ms: float = 0.0
     model_id: str = ""
+    # True when this response was served from the on-disk cache rather than
+    # by calling the model. Cached calls are excluded from latency stats.
+    cached: bool = False
     metadata: dict = field(default_factory=dict)
 
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
+
+    def to_cache_payload(self) -> dict:
+        return {
+            "text": self.text,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "latency_ms": self.latency_ms,
+            "model_id": self.model_id,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_cache_payload(cls, payload: dict) -> VLMResponse:
+        return cls(
+            text=payload["text"],
+            input_tokens=payload.get("input_tokens", 0),
+            output_tokens=payload.get("output_tokens", 0),
+            latency_ms=payload.get("latency_ms", 0.0),
+            model_id=payload.get("model_id", ""),
+            cached=True,
+            metadata=payload.get("metadata", {}),
+        )
+
+
+@dataclass
+class ChoiceScores:
+    """Log-probabilities assigned to each candidate continuation."""
+
+    logprobs: list[float]
+    # Log-probability normalized by continuation token count. Reported
+    # separately because unnormalized scores favour short options.
+    logprobs_per_token: list[float]
+    latency_ms: float = 0.0
+    model_id: str = ""
+
+    def argmax(self, length_normalized: bool = True) -> int:
+        scores = self.logprobs_per_token if length_normalized else self.logprobs
+        return max(range(len(scores)), key=scores.__getitem__)
 
 
 @dataclass
@@ -78,3 +119,38 @@ class VLMAdapter(Protocol):
     def cost_per_million_output_tokens(self) -> float | None:
         """Cost in USD per 1M output tokens, or None for local models."""
         ...
+
+
+@runtime_checkable
+class ChoiceScoringAdapter(Protocol):
+    """Optional capability: score candidate answers by log-likelihood.
+
+    This is how open-weight models are compared on multiple-choice
+    benchmarks — every option is scored under the model and the highest wins,
+    with no free-text generation and therefore no answer-extraction step to
+    fail. Numbers produced by generating text and regexing out a letter are
+    not comparable to published leaderboard figures.
+
+    Adapters that cannot do this (hosted APIs that expose no log-probs)
+    simply do not implement it; the runner checks `supports_choice_scoring`.
+    """
+
+    @property
+    def supports_choice_scoring(self) -> bool: ...
+
+    def score_choices(
+        self,
+        images: list[Image.Image | str],
+        prompt: str,
+        choices: list[str],
+        system: str | None = None,
+    ) -> ChoiceScores:
+        """Return the log-probability of each choice as a continuation of the prompt."""
+        ...
+
+
+def supports_choice_scoring(adapter: object) -> bool:
+    """Whether `adapter` can score choices by log-likelihood."""
+    return bool(getattr(adapter, "supports_choice_scoring", False)) and hasattr(
+        adapter, "score_choices"
+    )

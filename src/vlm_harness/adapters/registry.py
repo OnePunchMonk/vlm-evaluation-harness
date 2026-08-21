@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from vlm_harness.adapters.base import VLMAdapter
 
+# Only providers with an implementation in this package are listed. The
+# registry previously advertised google/vllm/ollama/litellm, and pyproject
+# shipped matching extras, for adapter modules that did not exist.
 _PROVIDERS: dict[str, str] = {
     "mock": "vlm_harness.adapters.mock.MockAdapter",
     "anthropic": "vlm_harness.adapters.anthropic.AnthropicAdapter",
     "openai": "vlm_harness.adapters.openai.OpenAIAdapter",
-    "google": "vlm_harness.adapters.google.GoogleAdapter",
     "huggingface": "vlm_harness.adapters.huggingface.HuggingFaceAdapter",
     "hf": "vlm_harness.adapters.huggingface.HuggingFaceAdapter",
-    "vllm": "vlm_harness.adapters.vllm.VLLMAdapter",
-    "ollama": "vlm_harness.adapters.ollama.OllamaAdapter",
-    "litellm": "vlm_harness.adapters.litellm.LiteLLMAdapter",
 }
+
+# Extras name to install for each provider, where it differs from the provider key.
+_EXTRAS: dict[str, str] = {"hf": "huggingface", "mock": ""}
 
 
 def get_adapter(model_spec: str, **kwargs) -> VLMAdapter:
@@ -24,7 +26,7 @@ def get_adapter(model_spec: str, **kwargs) -> VLMAdapter:
     Examples:
         get_adapter("anthropic:claude-opus-4-6")
         get_adapter("openai:gpt-4o")
-        get_adapter("huggingface:liuhaotian/llava-v1.6-34b", device="cuda:0")
+        get_adapter("huggingface:llava-hf/llava-1.5-7b-hf", device="cuda:0")
     """
     if ":" not in model_spec:
         raise ValueError(
@@ -37,20 +39,20 @@ def get_adapter(model_spec: str, **kwargs) -> VLMAdapter:
 
     if provider not in _PROVIDERS:
         available = ", ".join(sorted(_PROVIDERS))
-        raise ValueError(
-            f"Unknown provider '{provider}'. Available providers: {available}"
-        )
+        raise ValueError(f"Unknown provider '{provider}'. Available providers: {available}")
 
     module_path, class_name = _PROVIDERS[provider].rsplit(".", 1)
 
     try:
         import importlib
+
         module = importlib.import_module(module_path)
         adapter_cls = getattr(module, class_name)
     except ImportError as e:
+        extra = _EXTRAS.get(provider, provider)
+        hint = f"pip install vlm-harness[{extra}]" if extra else "check your installation"
         raise ImportError(
-            f"Could not import adapter for provider '{provider}'. "
-            f"Install the required extras: pip install vlm-harness[{provider}]\n"
+            f"Could not import adapter for provider '{provider}'. {hint}\n"
             f"Original error: {e}"
         ) from e
 

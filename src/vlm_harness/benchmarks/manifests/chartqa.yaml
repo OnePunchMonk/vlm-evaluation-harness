@@ -37,7 +37,8 @@ answer_extraction:
   normalize: strip
 
 metrics:
-  - type: accuracy
+  - type: relaxed_accuracy
+    tolerance: 0.05
   - type: f1
 
 few_shot:

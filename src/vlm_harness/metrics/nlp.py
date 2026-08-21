@@ -1,4 +1,4 @@
-"""NLP metrics: F1, ANLS, BLEU, ROUGE."""
+"""NLP metrics: F1, ANLS, BLEU, ROUGE — all scored against multiple references."""
 
 from __future__ import annotations
 
@@ -6,27 +6,31 @@ import re
 import unicodedata
 from collections import Counter
 
-from vlm_harness.metrics.base import MetricResult
+from vlm_harness.metrics.base import NAN, MetricResult, ScoredSample, aggregate
+
+
+def _tokenize(text: str) -> list[str]:
+    text = unicodedata.normalize("NFD", text).lower()
+    text = re.sub(r"[^\w\s]", " ", text)
+    return text.split()
 
 
 class F1Metric:
-    """Token-level F1 score (used in QA tasks like SQuAD)."""
+    """Token-level F1, taking the best score over the sample's references."""
 
-    def compute(
-        self, predictions: list[str], references: list[str], metadata: list[dict]
-    ) -> MetricResult:
-        scores = [self._token_f1(p, r) for p, r in zip(predictions, references)]
-        return MetricResult(
-            metric_name="f1",
-            value=sum(scores) / len(scores) if scores else 0.0,
-            n_samples=len(scores),
+    def compute(self, samples: list[ScoredSample]) -> MetricResult:
+        return aggregate("f1", samples, self.score)
+
+    def score(self, sample: ScoredSample) -> float:
+        return max(
+            (self._token_f1(sample.prediction, ref) for ref in sample.references), default=0.0
         )
 
     def _token_f1(self, prediction: str, ground_truth: str) -> float:
-        pred_tokens = self._tokenize(prediction)
-        gt_tokens = self._tokenize(ground_truth)
+        pred_tokens = _tokenize(prediction)
+        gt_tokens = _tokenize(ground_truth)
         if not pred_tokens or not gt_tokens:
-            return int(pred_tokens == gt_tokens)
+            return float(pred_tokens == gt_tokens)
         common = Counter(pred_tokens) & Counter(gt_tokens)
         num_same = sum(common.values())
         if num_same == 0:
@@ -35,32 +39,30 @@ class F1Metric:
         recall = num_same / len(gt_tokens)
         return 2 * precision * recall / (precision + recall)
 
-    def _tokenize(self, text: str) -> list[str]:
-        text = unicodedata.normalize("NFD", text).lower()
-        text = re.sub(r"[^\w\s]", " ", text)
-        return text.split()
-
 
 class ANLSMetric:
-    """Average Normalized Levenshtein Similarity (DocVQA metric)."""
+    """Average Normalized Levenshtein Similarity (DocVQA metric).
 
-    def compute(
-        self, predictions: list[str], references: list[str], metadata: list[dict]
-    ) -> MetricResult:
-        scores = [self._anls(p, r) for p, r in zip(predictions, references)]
-        return MetricResult(
-            metric_name="anls",
-            value=sum(scores) / len(scores) if scores else 0.0,
-            n_samples=len(scores),
-        )
+    The official metric takes the maximum similarity over all provided
+    ground-truth strings, thresholded at 0.5.
+    """
 
-    def _anls(self, prediction: str, reference: str, threshold: float = 0.5) -> float:
-        dist = self._edit_distance(prediction.lower(), reference.lower())
-        max_len = max(len(prediction), len(reference))
+    def __init__(self, threshold: float = 0.5):
+        self._threshold = threshold
+
+    def compute(self, samples: list[ScoredSample]) -> MetricResult:
+        return aggregate("anls", samples, self.score)
+
+    def score(self, sample: ScoredSample) -> float:
+        return max((self._anls(sample.prediction, ref) for ref in sample.references), default=0.0)
+
+    def _anls(self, prediction: str, reference: str) -> float:
+        pred, ref = prediction.lower().strip(), reference.lower().strip()
+        max_len = max(len(pred), len(ref))
         if max_len == 0:
             return 1.0
-        nls = 1.0 - dist / max_len
-        return nls if nls >= threshold else 0.0
+        nls = 1.0 - self._edit_distance(pred, ref) / max_len
+        return nls if nls >= self._threshold else 0.0
 
     def _edit_distance(self, s1: str, s2: str) -> int:
         m, n = len(s1), len(s2)
@@ -79,58 +81,68 @@ class ANLSMetric:
 
 
 class BLEUMetric:
-    """Corpus BLEU score (requires sacrebleu)."""
+    """Corpus BLEU. Uses sacrebleu's native multi-reference support when available."""
 
-    def compute(
-        self, predictions: list[str], references: list[str], metadata: list[dict]
-    ) -> MetricResult:
+    def compute(self, samples: list[ScoredSample]) -> MetricResult:
+        scorable = [s for s in samples if s.has_reference]
+        if not scorable:
+            return MetricResult(
+                metric_name="bleu", value=NAN, n_samples=len(samples), n_scored=0
+            )
+
+        predictions = [s.prediction for s in scorable]
+        # sacrebleu wants reference streams: one list per reference slot.
+        width = max(len(s.references) for s in scorable)
+        ref_streams = [
+            [s.references[i] if i < len(s.references) else s.references[-1] for s in scorable]
+            for i in range(width)
+        ]
         try:
             import sacrebleu
-            result = sacrebleu.corpus_bleu(predictions, [references])
+
+            result = sacrebleu.corpus_bleu(predictions, ref_streams)
             return MetricResult(
                 metric_name="bleu",
                 value=result.score / 100.0,
-                n_samples=len(predictions),
-                metadata={"bleu_score": result.score},
+                n_samples=len(samples),
+                n_scored=len(scorable),
+                metadata={"bleu_score": result.score, "backend": "sacrebleu"},
             )
         except ImportError:
-            # Fallback: simple unigram precision
-            scores = []
-            for pred, ref in zip(predictions, references):
-                pred_tok = pred.lower().split()
-                ref_tok = ref.lower().split()
-                if not pred_tok:
-                    scores.append(0.0)
-                    continue
-                common = Counter(pred_tok) & Counter(ref_tok)
-                scores.append(sum(common.values()) / len(pred_tok))
-            return MetricResult(
-                metric_name="bleu_approx",
-                value=sum(scores) / len(scores) if scores else 0.0,
-                n_samples=len(scores),
-            )
+            result = aggregate("bleu_approx", samples, self._unigram_precision)
+            result.metadata["backend"] = "fallback_unigram_precision"
+            return result
+
+    def _unigram_precision(self, sample: ScoredSample) -> float:
+        pred_tok = sample.prediction.lower().split()
+        if not pred_tok:
+            return 0.0
+        best = 0.0
+        for ref in sample.references:
+            common = Counter(pred_tok) & Counter(ref.lower().split())
+            best = max(best, sum(common.values()) / len(pred_tok))
+        return best
 
 
 class RougeMetric:
-    """ROUGE-L score."""
+    """ROUGE-L F-measure, best over the sample's references."""
 
-    def compute(
-        self, predictions: list[str], references: list[str], metadata: list[dict]
-    ) -> MetricResult:
+    def compute(self, samples: list[ScoredSample]) -> MetricResult:
+        scorer = self._build_scorer()
+
+        def score(sample: ScoredSample) -> float:
+            return max((scorer(sample.prediction, r) for r in sample.references), default=0.0)
+
+        return aggregate("rouge_l", samples, score)
+
+    def _build_scorer(self):
         try:
             from rouge_score import rouge_scorer
+
             scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
-            scores = [
-                scorer.score(ref, pred)["rougeL"].fmeasure
-                for pred, ref in zip(predictions, references)
-            ]
+            return lambda pred, ref: scorer.score(ref, pred)["rougeL"].fmeasure
         except ImportError:
-            scores = [self._rouge_l(p, r) for p, r in zip(predictions, references)]
-        return MetricResult(
-            metric_name="rouge_l",
-            value=sum(scores) / len(scores) if scores else 0.0,
-            n_samples=len(scores),
-        )
+            return self._rouge_l
 
     def _rouge_l(self, prediction: str, reference: str) -> float:
         pred_tok = prediction.lower().split()
@@ -149,5 +161,7 @@ class RougeMetric:
         dp = [[0] * (n + 1) for _ in range(m + 1)]
         for i in range(1, m + 1):
             for j in range(1, n + 1):
-                dp[i][j] = dp[i-1][j-1] + 1 if x[i-1] == y[j-1] else max(dp[i-1][j], dp[i][j-1])
+                dp[i][j] = dp[i - 1][j - 1] + 1 if x[i - 1] == y[j - 1] else max(
+                    dp[i - 1][j], dp[i][j - 1]
+                )
         return dp[m][n]

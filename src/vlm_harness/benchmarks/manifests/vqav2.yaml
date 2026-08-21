@@ -21,7 +21,10 @@ task_type: open_ended
 
 fields:
   question: question
-  answer: multiple_choice_answer
+  # VQAv2 ships ten independent annotator answers per question; scoring
+  # against a single canonical one systematically under-reports and is not
+  # comparable to any published VQAv2 number.
+  answers: answers
   images:
     - image
 
@@ -39,7 +42,7 @@ answer_extraction:
   normalize: vqa
 
 metrics:
-  - type: accuracy
+  - type: vqa_accuracy
   - type: f1
 
 few_shot:

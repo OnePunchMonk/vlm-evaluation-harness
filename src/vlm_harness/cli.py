@@ -23,9 +23,18 @@ def eval(
     max_samples: int | None = typer.Option(None, "--max-samples", help="Limit samples"),
     max_tokens: int = typer.Option(1024, "--max-tokens"),
     temperature: float = typer.Option(0.0, "--temperature"),
+    max_concurrent: int = typer.Option(1, "--max-concurrent", help="Parallel in-flight requests"),
     output_dir: Path | None = typer.Option(None, "--output-dir", "-o"),
-    robustness: str | None = typer.Option(None, "--corruptions", help="Comma-sep corruptions"),
+    corruptions: str | None = typer.Option(
+        None, "--corruptions", help="Comma-sep image corruptions for robustness probing"
+    ),
+    corruption_severity: int = typer.Option(2, "--corruption-severity"),
     track: bool = typer.Option(True, "--track/--no-track", help="Record this run to local history"),
+    use_cache: bool = typer.Option(
+        True,
+        "--cache/--no-cache",
+        help="Cache model responses, keyed by (model, prompt, images, params)",
+    ),
 ):
     """Evaluate a model on one or more benchmarks."""
     from vlm_harness.adapters.registry import get_adapter
@@ -46,8 +55,13 @@ def eval(
             max_samples=max_samples,
             max_tokens=max_tokens,
             temperature=temperature,
+            max_concurrent=max_concurrent,
             output_dir=output_dir,
-            robustness_corruptions=[c.strip() for c in robustness.split(",")] if robustness else [],
+            robustness_corruptions=(
+                [c.strip() for c in corruptions.split(",")] if corruptions else []
+            ),
+            corruption_severity=corruption_severity,
+            use_cache=use_cache,
         )
         result = runner.run(config)
         print_results(result)
@@ -134,18 +148,27 @@ def list_benchmarks(
 def validate_bench(
     bench: str = typer.Option(..., "--bench", "-b"),
 ):
-    """Validate a benchmark manifest."""
+    """Validate a benchmark manifest.
+
+    Checks structural validity (known metric/task types, resolvable prompt
+    template placeholders, a reference field for every scorable split) in
+    addition to the YAML parsing the old command did — this is what would
+    have caught Winoground's unfillable {caption_0} template at manifest
+    load time instead of silently sending literal braces to the model.
+    """
     from vlm_harness.benchmarks.registry import get_registry
+    from vlm_harness.benchmarks.schema import ManifestError
 
     try:
         registry = get_registry()
         manifest = registry.get(bench)
         console.print(f"[green]✓[/green] Manifest for '{manifest.name}' is valid.")
         console.print(f"  Task type: {manifest.task_type}")
+        console.print(f"  Scoring:   {manifest.scoring}")
         console.print(f"  Modality:  {manifest.modality}")
         console.print(f"  Splits:    {[s.name for s in manifest.splits]}")
         console.print(f"  Metrics:   {[m.type for m in manifest.metrics]}")
-    except KeyError as e:
+    except (KeyError, ManifestError) as e:
         console.print(f"[red]✗[/red] {e}")
         raise typer.Exit(1)
 
@@ -207,23 +230,48 @@ def estimate_cost(
 
 @app.command()
 def reproduce(
-    manifest_file: Path = typer.Argument(..., help="Path to a results manifest JSON"),
+    results_file: Path = typer.Argument(..., help="Path to a *_results.json file"),
 ):
-    """Re-run an evaluation from a saved results manifest."""
+    """Re-run an evaluation exactly as recorded in a saved results file.
+
+    Reads back the decoding parameters, corruptions, and split from the
+    result's `provenance` block rather than assuming today's CLI defaults —
+    otherwise "reproduce" silently reproduces a different run.
+    """
     import json
-    data = json.loads(manifest_file.read_text())
+
+    from vlm_harness.adapters.registry import get_adapter
+    from vlm_harness.engine.runner import EvalConfig, EvalRunner
+    from vlm_harness.reporting.terminal import print_results
+    from vlm_harness.tracking import HistoryStore
+
+    data = json.loads(results_file.read_text())
+    provenance = data.get("provenance", {})
+    decoding = provenance.get("decoding", {})
+    images = provenance.get("images", {})
+
     console.print(f"Reproducing: {data.get('benchmark')} with {data.get('model')}")
-    eval(
-        model=data["model"],
-        bench=data["benchmark"],
+    if not provenance:
+        console.print(
+            "[yellow]Warning: this results file has no provenance block "
+            "(pre-0.2 run) — falling back to CLI defaults.[/yellow]"
+        )
+
+    adapter = get_adapter(data["model"])
+    runner = EvalRunner(adapter)
+    config = EvalConfig(
+        model_spec=data["model"],
+        benchmark=data["benchmark"],
         split=data["split"],
-        max_samples=None,
-        max_tokens=1024,
-        temperature=0.0,
-        output_dir=None,
-        robustness=None,
-        track=True,
+        max_tokens=decoding.get("max_tokens", 1024),
+        temperature=decoding.get("temperature", 0.0),
+        seed=decoding.get("seed", 42),
+        robustness_corruptions=images.get("corruptions", []),
+        corruption_severity=images.get("corruption_severity", 2),
     )
+    result = runner.run(config)
+    print_results(result)
+    HistoryStore().record_result(result, modality="discriminative")
 
 
 @app.command("gen-eval")
@@ -344,6 +392,7 @@ def regression(
     severity_style = {
         "CRITICAL": "bold red", "HIGH": "red", "MEDIUM": "yellow",
         "LOW": "blue", "MINIMAL": "dim", "OK": "green",
+        "NOT_SIGNIFICANT": "dim",
     }
     for d in deltas:
         style = severity_style.get(d.severity, "")
@@ -352,6 +401,17 @@ def regression(
             f"{d.delta:+.4f}", f"[{style}]{d.severity}[/{style}]",
         )
     console.print(table)
+
+    paired = [d for d in deltas if d.mcnemar is not None]
+    if paired:
+        console.print(
+            "\n[dim]Paired McNemar test over per-sample scores "
+            f"({len(paired)}/{len(deltas)} metrics); "
+            "remaining metrics fall back to a magnitude threshold "
+            "(no per-sample history recorded for one of the two runs).[/dim]"
+        )
+        for d in paired:
+            console.print(f"  [dim]{d.metric_name}: {d.mcnemar.summary()}[/dim]")
 
     flagged = [d for d in deltas if d.flagged]
     if flagged:

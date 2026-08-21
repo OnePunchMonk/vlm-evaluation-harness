@@ -22,18 +22,13 @@ task_type: open_ended
 
 fields:
   question: question
-  answer: answers
+  answers: answers
   images:
     - image
 
 image_config:
   max_images: 1
   placement: before_text
-
-three_d:
-  depth_maps:
-    - depth_image
-  multi_view: []
 
 prompt_template: |
   This is an image of a 3D indoor scene.
