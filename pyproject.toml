@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vlm-harness"
-version = "0.1.0"
+version = "0.2.0"
 description = "A unified evaluation framework for Vision Language Models"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -24,14 +24,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Only providers with an actual adapter implementation are listed here.
+# google/vllm/ollama/litellm extras previously existed with no matching
+# adapter module, so installing them succeeded and using them failed.
 anthropic = ["anthropic>=0.30.0"]
 openai = ["openai>=1.30.0"]
-google = ["google-generativeai>=0.7.0"]
 huggingface = ["transformers>=4.40.0", "torch>=2.0.0", "accelerate>=0.30.0"]
-vllm = ["vllm>=0.4.0"]
-ollama = ["ollama>=0.2.0"]
-litellm = ["litellm>=1.40.0"]
-lm-eval = ["lm-eval>=0.4.0"]
 metrics = ["rouge-score>=0.1.2", "nltk>=3.8", "sacrebleu>=2.4.0"]
 # Generative (text-to-image) support: local diffusers backend + CLIPScore /
 # GenEval-approximation / FID metrics. The mock T2I adapter needs none of this.
@@ -50,7 +48,7 @@ dev = [
     "mypy>=1.10.0",
 ]
 all = [
-    "vlm-harness[anthropic,openai,google,huggingface,metrics,lm-eval,generative]",
+    "vlm-harness[anthropic,openai,huggingface,metrics,generative]",
 ]
 
 [project.scripts]

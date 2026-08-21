@@ -13,7 +13,7 @@ import hashlib
 import re
 import time
 
-from vlm_harness.adapters.base import ConversationTurn, VLMResponse
+from vlm_harness.adapters.base import ChoiceScores, ConversationTurn, VLMResponse
 
 
 class MockAdapter:
@@ -63,6 +63,33 @@ class MockAdapter:
             input_tokens=len(prompt.split()),
             output_tokens=len(text.split()),
             latency_ms=latency_ms,
+            model_id=self._model_id,
+        )
+
+    @property
+    def supports_choice_scoring(self) -> bool:
+        return True
+
+    def score_choices(
+        self,
+        images: list,
+        prompt: str,
+        choices: list[str],
+        system: str | None = None,
+    ) -> ChoiceScores:
+        """Deterministic pseudo log-probabilities, so the loglikelihood
+        scoring path is exercised offline exactly like the generate path."""
+        t0 = time.perf_counter()
+        logprobs = []
+        for choice in choices:
+            digest = hashlib.md5(f"{self._model_id}::{prompt}::{choice}".encode()).hexdigest()
+            h = int(digest[:8], 16)
+            logprobs.append(-(h % 1000) / 100.0)
+        n_tokens = [max(1, len(c.split())) for c in choices]
+        return ChoiceScores(
+            logprobs=logprobs,
+            logprobs_per_token=[lp / n for lp, n in zip(logprobs, n_tokens)],
+            latency_ms=(time.perf_counter() - t0) * 1000,
             model_id=self._model_id,
         )
 

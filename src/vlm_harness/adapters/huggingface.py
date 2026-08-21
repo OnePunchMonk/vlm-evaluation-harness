@@ -6,7 +6,7 @@ import time
 
 from PIL import Image
 
-from vlm_harness.adapters.base import ConversationTurn, VLMResponse
+from vlm_harness.adapters.base import ChoiceScores, ConversationTurn, VLMResponse
 
 
 class HuggingFaceAdapter:
@@ -21,13 +21,10 @@ class HuggingFaceAdapter:
         trust_remote_code: bool = True,
     ):
         try:
-            import torch
-            from transformers import AutoProcessor, AutoModelForVision2Seq, pipeline
+            import torch as _torch
+            from transformers import AutoModelForVision2Seq, AutoProcessor
         except ImportError:
             raise ImportError("pip install vlm-harness[huggingface]")
-
-        import torch as _torch
-        from transformers import AutoProcessor, AutoModelForVision2Seq
 
         dtype_map = {
             "auto": "auto",
@@ -118,5 +115,73 @@ class HuggingFaceAdapter:
             input_tokens=input_len,
             output_tokens=new_ids.shape[-1],
             latency_ms=latency_ms,
+            model_id=self._model_id,
+        )
+
+    @property
+    def supports_choice_scoring(self) -> bool:
+        return True
+
+    def score_choices(
+        self,
+        images: list[Image.Image | str],
+        prompt: str,
+        choices: list[str],
+        system: str | None = None,
+    ) -> ChoiceScores:
+        """Log-probability of each choice as a continuation of the prompt.
+
+        This is the scoring path used by MC benchmarks with
+        `scoring: loglikelihood`, and is what makes results comparable with
+        published open-weight leaderboard numbers. Both the summed and the
+        length-normalized log-probability are returned; the runner uses the
+        normalized one by default so that longer options are not penalized.
+        """
+        import torch
+
+        pil_images = [Image.open(img) if isinstance(img, str) else img for img in images]
+        full_prompt = (f"{system}\n\n" if system else "") + prompt
+
+        logprobs: list[float] = []
+        per_token: list[float] = []
+
+        t0 = time.perf_counter()
+        for choice in choices:
+            context = self._processor(
+                text=full_prompt,
+                images=pil_images if pil_images else None,
+                return_tensors="pt",
+            ).to(self._model.device)
+            full = self._processor(
+                text=full_prompt + choice,
+                images=pil_images if pil_images else None,
+                return_tensors="pt",
+            ).to(self._model.device)
+
+            context_len = context["input_ids"].shape[-1]
+            input_ids = full["input_ids"]
+            n_choice_tokens = input_ids.shape[-1] - context_len
+            if n_choice_tokens <= 0:
+                logprobs.append(float("-inf"))
+                per_token.append(float("-inf"))
+                continue
+
+            with torch.no_grad():
+                logits = self._model(**full).logits
+
+            # Predict token t from position t-1.
+            log_probs = torch.log_softmax(logits[:, :-1, :].float(), dim=-1)
+            targets = input_ids[:, 1:]
+            token_logprobs = log_probs.gather(2, targets.unsqueeze(-1)).squeeze(-1)
+            choice_logprobs = token_logprobs[0, context_len - 1 :]
+
+            total = float(choice_logprobs.sum())
+            logprobs.append(total)
+            per_token.append(total / n_choice_tokens)
+
+        return ChoiceScores(
+            logprobs=logprobs,
+            logprobs_per_token=per_token,
+            latency_ms=(time.perf_counter() - t0) * 1000,
             model_id=self._model_id,
         )

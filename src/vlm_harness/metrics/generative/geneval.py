@@ -41,12 +41,14 @@ class GenEvalClipMetric:
         images: list[Image.Image],
         checks_list: list[dict | None],
         metadata: list[dict] | None = None,
+        sample_ids: list[str] | None = None,
     ) -> MetricResult:
         attr_hits = {"color": 0, "shape": 0, "count": 0}
         attr_total = {"color": 0, "shape": 0, "count": 0}
-        strict_correct = 0
+        ids = sample_ids or [str(i) for i in range(len(images))]
+        per_sample: dict[str, float] = {}
 
-        for image, checks in zip(images, checks_list):
+        for sample_id, image, checks in zip(ids, images, checks_list):
             checks = checks or {}
             all_ok = True
 
@@ -77,15 +79,19 @@ class GenEvalClipMetric:
                 attr_total["count"] += 1
                 all_ok &= hit
 
-            strict_correct += int(all_ok)
+            per_sample[sample_id] = float(all_ok)
+
+        from vlm_harness.metrics.base import NAN
 
         n = len(images)
         breakdown = {
-            k: (attr_hits[k] / attr_total[k] if attr_total[k] else 0.0) for k in attr_hits
+            k: (attr_hits[k] / attr_total[k]) for k in attr_hits if attr_total[k]
         }
         return MetricResult(
             metric_name="geneval_clip",
-            value=strict_correct / n if n else 0.0,
+            value=sum(per_sample.values()) / n if n else NAN,
             breakdown=breakdown,
             n_samples=n,
+            n_scored=len(per_sample),
+            per_sample=per_sample,
         )

@@ -25,7 +25,7 @@ def test_demo_mc_loads_local_fixture_images():
     assert len(samples) == 12
     for s in samples:
         assert len(s.images) == 1
-        assert s.answer in {"A", "B", "C", "D", "E", "F"}
+        assert s.references and s.references[0] in {"A", "B", "C", "D", "E", "F"}
         assert s.metadata["subject"] == "color"
 
 
@@ -57,3 +57,21 @@ def test_full_offline_discriminative_run():
     assert len(result.sample_results) == 12
     accuracy = next(m for m in result.metrics if m.metric_name == "accuracy")
     assert 0.0 <= accuracy.value <= 1.0
+
+
+def test_every_builtin_manifest_passes_validation():
+    """Regression guard for the Winoground bug this harness used to ship:
+    a manifest whose prompt template referenced fields the loader could
+    never populate, silently sending literal '{caption_0}' to the model.
+    `validate()` now runs at load time, so a manifest like that can never
+    reach the registry in the first place.
+    """
+    registry = get_registry()
+    assert registry.errors() == {}
+
+
+def test_winoground_prompt_resolves_all_placeholders():
+    registry = get_registry()
+    manifest = registry.get("winoground")
+    missing = manifest.template_variables() - manifest.available_variables()
+    assert missing == set()

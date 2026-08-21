@@ -12,8 +12,6 @@ This script:
   4. Cleans up the weights afterward
 """
 
-import sys
-import textwrap
 from pathlib import Path
 
 import numpy as np
@@ -71,8 +69,8 @@ def run():
 
     # ── Load model ────────────────────────────────────────────────────────────
     print("\n[1/4] Loading openai/clip-vit-base-patch32 ...")
-    from transformers import CLIPProcessor, CLIPModel
     import torch
+    from transformers import CLIPModel, CLIPProcessor
 
     model_name = "openai/clip-vit-base-patch32"
     model = CLIPModel.from_pretrained(model_name)
@@ -123,7 +121,6 @@ def run():
     # ── Cleanup ───────────────────────────────────────────────────────────────
     print("\n[4/4] Deleting model weights from cache ...")
     import shutil
-    from pathlib import Path
 
     hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
     deleted_bytes = 0

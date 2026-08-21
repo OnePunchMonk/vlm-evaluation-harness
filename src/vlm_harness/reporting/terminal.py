@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from rich import box
 from rich.console import Console
 from rich.table import Table
-from rich import box
 
 console = Console()
 
@@ -18,10 +18,10 @@ def print_results(result) -> None:
     table = Table(box=box.ROUNDED, show_header=True, header_style="bold")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", justify="right", style="green")
-    table.add_column("N Samples", justify="right")
+    table.add_column("N Scored", justify="right")
 
     for m in result.metrics:
-        table.add_row(m.metric_name, f"{m.value:.4f}", str(m.n_samples))
+        table.add_row(m.metric_name, f"{m.value:.4f}", f"{m.n_scored}/{m.n_samples}")
 
     console.print(table)
 

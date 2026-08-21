@@ -40,7 +40,7 @@ answer_extraction:
   normalize: lowercase
 
 metrics:
-  - type: accuracy
+  - type: pope
   - type: accuracy_by_group
     group_field: subject
 
