@@ -1,8 +1,9 @@
 """Run history: an append-only local record of every tracked evaluation run.
 
-Storage is a JSON-lines file rather than a database — it's diffable, greppable,
-trivially portable, and needs zero setup. One line per run. This is what
-regression tracking and the report generator both read from.
+Aggregate metrics go in the JSON-lines history file (diffable, greppable,
+zero setup). Per-sample scores — needed for paired significance testing —
+are too large for that file to stay diffable, so they go alongside it as one
+JSON file per run, referenced by `run_id`.
 """
 
 from __future__ import annotations
@@ -19,6 +20,10 @@ def _default_path() -> Path:
     return Path.home() / ".vlm-harness" / "history.jsonl"
 
 
+def _default_samples_dir() -> Path:
+    return Path.home() / ".vlm-harness" / "samples"
+
+
 @dataclass
 class HistoryEntry:
     run_id: str
@@ -29,6 +34,8 @@ class HistoryEntry:
     modality: str  # "discriminative" | "generative"
     metrics: dict[str, float]
     n_samples: int
+    n_scored: dict[str, int] = field(default_factory=dict)
+    provenance: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -41,6 +48,8 @@ class HistoryEntry:
             "modality": self.modality,
             "metrics": self.metrics,
             "n_samples": self.n_samples,
+            "n_scored": self.n_scored,
+            "provenance": self.provenance,
             "metadata": self.metadata,
         }
 
@@ -55,6 +64,8 @@ class HistoryEntry:
             modality=data.get("modality", "discriminative"),
             metrics=data.get("metrics", {}),
             n_samples=data.get("n_samples", 0),
+            n_scored=data.get("n_scored", {}),
+            provenance=data.get("provenance", {}),
             metadata=data.get("metadata", {}),
         )
 
@@ -62,8 +73,9 @@ class HistoryEntry:
 class HistoryStore:
     """Appends and queries evaluation runs stored as JSON-lines."""
 
-    def __init__(self, path: Path | None = None):
+    def __init__(self, path: Path | None = None, samples_dir: Path | None = None):
         self.path = path or _default_path()
+        self.samples_dir = samples_dir or _default_samples_dir()
 
     def record(
         self,
@@ -73,7 +85,10 @@ class HistoryStore:
         metrics: dict[str, float],
         n_samples: int,
         modality: str = "discriminative",
+        n_scored: dict[str, int] | None = None,
+        provenance: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
+        per_sample: dict[str, dict[str, float]] | None = None,
     ) -> HistoryEntry:
         entry = HistoryEntry(
             run_id=uuid.uuid4().hex[:12],
@@ -84,16 +99,24 @@ class HistoryStore:
             modality=modality,
             metrics=metrics,
             n_samples=n_samples,
+            n_scored=n_scored or {},
+            provenance=provenance or {},
             metadata=metadata or {},
         )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "a") as f:
-            f.write(json.dumps(entry.to_dict()) + "\n")
+            f.write(json.dumps(entry.to_dict(), default=str) + "\n")
+
+        if per_sample:
+            self.samples_dir.mkdir(parents=True, exist_ok=True)
+            (self.samples_dir / f"{entry.run_id}.json").write_text(json.dumps(per_sample))
+
         return entry
 
     def record_result(self, result: Any, modality: str = "discriminative") -> HistoryEntry:
         """Convenience wrapper: record an EvalResult or GenEvalResult directly."""
         d = result.to_dict()
+        per_sample = result.per_sample_scores() if hasattr(result, "per_sample_scores") else None
         return self.record(
             model=d["model"],
             benchmark=d["benchmark"],
@@ -101,7 +124,17 @@ class HistoryStore:
             metrics=d["metrics"],
             n_samples=d["n_samples"],
             modality=modality,
+            n_scored=d.get("metric_n_scored"),
+            provenance=d.get("provenance"),
+            per_sample=per_sample,
         )
+
+    def per_sample_scores(self, run_id: str) -> dict[str, dict[str, float]]:
+        """Load the per-sample scores recorded for a run, if any."""
+        path = self.samples_dir / f"{run_id}.json"
+        if not path.exists():
+            return {}
+        return json.loads(path.read_text())
 
     def all(self) -> list[HistoryEntry]:
         if not self.path.exists():

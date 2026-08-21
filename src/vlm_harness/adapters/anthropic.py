@@ -10,6 +10,7 @@ from pathlib import Path
 from PIL import Image
 
 from vlm_harness.adapters.base import ConversationTurn, VLMResponse
+from vlm_harness.retry import with_retries
 
 
 class AnthropicAdapter:
@@ -92,15 +93,26 @@ class AnthropicAdapter:
             kwargs["system"] = system
 
         t0 = time.perf_counter()
-        response = self._client.messages.create(**kwargs)
+        response = with_retries(lambda: self._client.messages.create(**kwargs))
         latency_ms = (time.perf_counter() - t0) * 1000
 
         return VLMResponse(
-            text=response.content[0].text,
+            text=self._response_text(response),
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
             latency_ms=latency_ms,
             model_id=response.model,
+        )
+
+    @staticmethod
+    def _response_text(response) -> str:
+        """Concatenate every text block in the response.
+
+        Indexing `content[0]` breaks whenever the first block is not text —
+        which is exactly what happens when extended thinking is enabled.
+        """
+        return "".join(
+            block.text for block in response.content if getattr(block, "type", None) == "text"
         )
 
     def _encode_image(self, image: Image.Image | str) -> dict:

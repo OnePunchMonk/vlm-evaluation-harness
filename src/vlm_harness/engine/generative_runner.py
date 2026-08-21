@@ -9,7 +9,7 @@ text, and scoring happens over images rather than extracted answer strings.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -23,8 +23,14 @@ from vlm_harness.benchmarks.schema import BenchmarkManifest
 from vlm_harness.metrics.base import MetricResult
 from vlm_harness.metrics.cost import GenCostTracker
 from vlm_harness.metrics.generative import compute_generative_metrics
+from vlm_harness.stats import bootstrap_ci
 
 _MAX_SAVED_IMAGES = 12
+HARNESS_VERSION = "0.2.0"
+
+
+class GenEvalError(RuntimeError):
+    """Raised when a generative run cannot produce trustworthy numbers."""
 
 
 @dataclass
@@ -41,6 +47,11 @@ class GenEvalConfig:
     guidance_scale: float = 7.0
     num_inference_steps: int = 30
     output_dir: Path | None = None
+    # Number of images to generate per prompt, each with a different seed.
+    # One image per prompt measures a single draw from the model's output
+    # distribution; FID and CLIPScore over a single draw are dominated by
+    # seed variance.
+    images_per_prompt: int = 1
 
 
 @dataclass
@@ -49,6 +60,7 @@ class GenSampleResult:
     prompt: str
     latency_ms: float
     cost_usd: float
+    seed: int | None
     metadata: dict[str, Any]
 
 
@@ -64,7 +76,18 @@ class GenEvalResult:
     cost_summary: Any
     started_at: str
     finished_at: str
-    harness_version: str = "0.1.0"
+    provenance: dict = field(default_factory=dict)
+    harness_version: str = HARNESS_VERSION
+
+    def metric_confidence_intervals(self) -> dict[str, tuple[float, float]]:
+        return {
+            m.metric_name: bootstrap_ci(list(m.per_sample.values()))
+            for m in self.metrics
+            if m.per_sample
+        }
+
+    def per_sample_scores(self) -> dict[str, dict[str, float]]:
+        return {m.metric_name: m.per_sample for m in self.metrics if m.per_sample}
 
     def to_dict(self) -> dict:
         return {
@@ -76,7 +99,12 @@ class GenEvalResult:
             "split": self.config.split,
             "n_samples": len(self.sample_results),
             "metrics": {m.metric_name: m.value for m in self.metrics},
+            "metric_n_scored": {m.metric_name: m.n_scored for m in self.metrics},
+            "metric_ci95": {
+                k: list(v) for k, v in self.metric_confidence_intervals().items()
+            },
             "metric_breakdowns": {m.metric_name: m.breakdown for m in self.metrics if m.breakdown},
+            "provenance": self.provenance,
             "cost": {
                 "total_usd": self.cost_summary.total_cost_usd,
                 "per_sample_usd": self.cost_summary.cost_per_sample_usd,
@@ -111,6 +139,7 @@ class GenEvalResult:
                 "prompt": s.prompt,
                 "latency_ms": s.latency_ms,
                 "cost_usd": s.cost_usd,
+                "seed": s.seed,
                 "metadata": s.metadata,
                 "image_path": image_paths[i],
             }
@@ -137,38 +166,57 @@ class GenerativeEvalRunner:
         samples: list[BenchmarkSample] = list(
             self._loader.load(manifest, config.split, config.max_samples)
         )
+        if not samples:
+            raise GenEvalError(
+                f"Benchmark '{manifest.name}' split '{config.split}' yielded zero samples."
+            )
 
         started_at = datetime.now(timezone.utc).isoformat()
         sample_results: list[GenSampleResult] = []
         images = []
 
+        n_variants = max(1, config.images_per_prompt)
         for sample in tqdm(samples, desc=f"Generating {manifest.name}"):
             prompt = sample.text_fields.get("question", "")
-            response = self._adapter.generate(
-                prompt=prompt,
-                seed=config.seed,
-                width=config.width,
-                height=config.height,
-                guidance_scale=config.guidance_scale,
-                num_inference_steps=config.num_inference_steps,
-            )
-            cost_tracker.record(response)
-            images.append(response.image)
-            sample_results.append(
-                GenSampleResult(
-                    sample_id=sample.sample_id,
+            for variant in range(n_variants):
+                seed = None if config.seed is None else config.seed + variant
+                response = self._adapter.generate(
                     prompt=prompt,
-                    latency_ms=response.latency_ms,
-                    cost_usd=response.cost_usd,
-                    metadata=sample.metadata,
+                    seed=seed,
+                    width=config.width,
+                    height=config.height,
+                    guidance_scale=config.guidance_scale,
+                    num_inference_steps=config.num_inference_steps,
                 )
-            )
+                cost_tracker.record(response)
+                images.append(response.image)
+                sample_id = (
+                    sample.sample_id if n_variants == 1 else f"{sample.sample_id}#{variant}"
+                )
+                sample_results.append(
+                    GenSampleResult(
+                        sample_id=sample_id,
+                        prompt=prompt,
+                        latency_ms=response.latency_ms,
+                        cost_usd=response.cost_usd,
+                        seed=seed,
+                        metadata=sample.metadata,
+                    )
+                )
 
         finished_at = datetime.now(timezone.utc).isoformat()
 
         prompts = [s.prompt for s in sample_results]
         metadata = [s.metadata for s in sample_results]
-        metrics = compute_generative_metrics(prompts, images, metadata, manifest.metrics)
+        sample_ids = [s.sample_id for s in sample_results]
+        metrics = compute_generative_metrics(
+            prompts, images, metadata, manifest.metrics, sample_ids
+        )
+        if all(m.n_scored == 0 for m in metrics):
+            raise GenEvalError(
+                f"No metric produced a score for '{manifest.name}' — check the manifest's "
+                "metrics configuration."
+            )
         cost_summary = cost_tracker.summary()
 
         result = GenEvalResult(
@@ -180,6 +228,7 @@ class GenerativeEvalRunner:
             cost_summary=cost_summary,
             started_at=started_at,
             finished_at=finished_at,
+            provenance=self._provenance(manifest, config, registry),
         )
 
         if config.output_dir:
@@ -187,3 +236,20 @@ class GenerativeEvalRunner:
             print(f"Results saved to {saved_path}")
 
         return result
+
+    def _provenance(self, manifest, config: GenEvalConfig, registry) -> dict[str, Any]:
+        return {
+            "harness_version": HARNESS_VERSION,
+            "model_spec": config.model_spec,
+            "adapter_model_id": self._adapter.model_id,
+            "benchmark_version": manifest.version,
+            "manifest_hash": registry.manifest_hash(manifest.name),
+            "generation": {
+                "seed": config.seed,
+                "width": config.width,
+                "height": config.height,
+                "guidance_scale": config.guidance_scale,
+                "num_inference_steps": config.num_inference_steps,
+                "images_per_prompt": config.images_per_prompt,
+            },
+        }

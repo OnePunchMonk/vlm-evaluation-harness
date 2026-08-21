@@ -39,13 +39,24 @@ class CLIPScorer:
         return max(cos, 0.0) * 2.5
 
     def compute(
-        self, prompts: list[str], images: list[Image.Image], metadata: list[dict] | None = None
+        self,
+        prompts: list[str],
+        images: list[Image.Image],
+        metadata: list[dict] | None = None,
+        sample_ids: list[str] | None = None,
     ) -> MetricResult:
-        scores = [self.score(p, im) for p, im in zip(prompts, images)]
-        avg = sum(scores) / len(scores) if scores else 0.0
+        from vlm_harness.metrics.base import NAN
+
+        ids = sample_ids or [str(i) for i in range(len(prompts))]
+        per_sample = {
+            sample_id: self.score(p, im) for sample_id, p, im in zip(ids, prompts, images)
+        }
+        avg = sum(per_sample.values()) / len(per_sample) if per_sample else NAN
         return MetricResult(
             metric_name="clip_score",
             value=avg,
-            n_samples=len(scores),
-            metadata={"raw_scores": scores},
+            n_samples=len(prompts),
+            n_scored=len(per_sample),
+            per_sample=per_sample,
+            metadata={"clip_model": self._model_id},
         )

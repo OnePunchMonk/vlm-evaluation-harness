@@ -1,0 +1,38 @@
+name: VQAScoreMini
+version: "1.0"
+description: >
+  Same open-ended prompt set as ClipScoreMini, scored via VQAScore instead
+  of CLIPScore: a VLM judge is asked "Does this figure show '{prompt}'?"
+  and the probability it assigns to "Yes" is the score. VQAScore
+  (Lin et al., 2024) correlates with human judgement substantially better
+  than CLIPScore on compositional prompts, since CLIP's text encoder is
+  largely a bag-of-words and misses attribute binding and relations.
+  Fully offline via the mock T2I adapter and mock judge.
+taxonomy_category: generative
+modality: text_to_image
+
+source:
+  type: local
+  path: ../fixtures/clipscore_mini
+
+splits:
+  - name: prompts
+    scorable: true
+
+task_type: text_to_image
+
+fields:
+  question: prompt
+  answer: null
+  metadata_fields:
+    - category
+
+image_config:
+  max_images: 0
+
+metrics:
+  - type: vqa_score
+    judge_model: "mock:judge-v1"
+
+few_shot:
+  count: 0

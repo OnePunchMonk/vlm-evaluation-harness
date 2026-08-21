@@ -1,10 +1,8 @@
 """Tests for answer extraction."""
 
-import pytest
 from vlm_harness.benchmarks.schema import AnswerExtractionConfig
 from vlm_harness.parsing.extractor import AnswerExtractor
 from vlm_harness.parsing.normalizer import normalize_answer
-
 
 extractor = AnswerExtractor()
 

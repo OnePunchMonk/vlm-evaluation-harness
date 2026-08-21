@@ -10,6 +10,7 @@ from pathlib import Path
 from PIL import Image
 
 from vlm_harness.adapters.base import ConversationTurn, VLMResponse
+from vlm_harness.retry import with_retries
 
 
 class OpenAIAdapter:
@@ -81,11 +82,13 @@ class OpenAIAdapter:
         messages.append({"role": "user", "content": content})
 
         t0 = time.perf_counter()
-        response = self._client.chat.completions.create(
-            model=self._model_id,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
+        response = with_retries(
+            lambda: self._client.chat.completions.create(
+                model=self._model_id,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
         )
         latency_ms = (time.perf_counter() - t0) * 1000
 
