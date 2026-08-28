@@ -2,7 +2,11 @@
 
 import math
 
-from vlm_evaluation_harness.metrics.accuracy import AccuracyMetric, RelaxedAccuracyMetric, VQAAccuracyMetric
+from vlm_evaluation_harness.metrics.accuracy import (
+    AccuracyMetric,
+    RelaxedAccuracyMetric,
+    VQAAccuracyMetric,
+)
 from vlm_evaluation_harness.metrics.base import ScoredSample
 
 metric = AccuracyMetric()

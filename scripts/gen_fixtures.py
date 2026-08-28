@@ -29,7 +29,9 @@ def _draw_shape(draw: ImageDraw.ImageDraw, shape: str, box, color) -> None:
         draw.rectangle(box, fill=color)
 
 
-def make_pair_image(path: Path, left_shape: str, left_color: str, right_shape: str, right_color: str) -> None:
+def make_pair_image(
+    path: Path, left_shape: str, left_color: str, right_shape: str, right_color: str
+) -> None:
     img = Image.new("RGB", (128, 64), (245, 245, 245))
     draw = ImageDraw.Draw(img)
     _draw_shape(draw, left_shape, (8, 8, 56, 56), COLORS[left_color])
@@ -88,7 +90,13 @@ def gen_comp_hardneg() -> None:
                 "answer": answer_letter,
                 "image": img_name,
                 "category": (
-                    "attribute" if rot == 1 else "relation" if rot == 2 else "object" if rot == 3 else "base"
+                    "attribute"
+                    if rot == 1
+                    else "relation"
+                    if rot == 2
+                    else "object"
+                    if rot == 3
+                    else "base"
                 ),
             }
         )

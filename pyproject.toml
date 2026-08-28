@@ -61,6 +61,9 @@ packages = ["src/vlm_evaluation_harness"]
 src = ["src"]
 line-length = 100
 target-version = "py310"
+# vlm_regcheck/ is a legacy standalone tool pending a keep-or-remove decision
+# (see issue #10) and isn't held to the same lint bar as the main package.
+extend-exclude = ["vlm_regcheck"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
