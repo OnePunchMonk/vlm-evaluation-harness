@@ -112,7 +112,6 @@ def gen_hallu_fg() -> None:
         img_name = f"images/scene_{scene_i:02d}.png"
         make_object_image(out / img_name, scene)
         present_shapes = {s for s, _ in scene}
-        present_colors = {c for _, c in scene}
         all_shapes = set(SHAPES)
         all_colors = set(COLORS)
 
