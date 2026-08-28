@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import random
 from collections.abc import Iterator
 from pathlib import Path
@@ -11,6 +12,8 @@ from typing import Any
 from vlm_evaluation_harness.benchmarks.schema import BenchmarkManifest
 
 _CACHE_DIR = Path.home() / ".vlm-evaluation-harness" / "cache"
+
+logger = logging.getLogger(__name__)
 
 
 class BenchmarkSample:
@@ -118,6 +121,15 @@ class BenchmarkLoader:
             raise ImportError("pip install datasets")
 
         src = manifest.source
+        if src.revision == "main":
+            logger.warning(
+                "benchmark '%s' loads huggingface dataset '%s' at revision 'main' — "
+                "a floating pointer, not a reproducible pin. Set source.revision to a "
+                "commit SHA or tag in the manifest so results stay reproducible if the "
+                "dataset is updated upstream.",
+                manifest.name,
+                src.path,
+            )
         dataset = load_dataset(
             src.path,
             src.subset,
