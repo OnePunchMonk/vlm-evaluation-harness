@@ -11,6 +11,7 @@ description: >
   counts as a pair-level success if the model gets both right, per the
   original Winoground protocol. See `pairwise_group` in metrics.
 taxonomy_category: cross_modal
+tags: [compositional]
 modality: cross_modal
 
 source:

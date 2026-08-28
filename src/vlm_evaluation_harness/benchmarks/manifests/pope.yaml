@@ -7,6 +7,7 @@ description: >
   Measures object hallucination in three difficulty tiers:
   random, popular (common objects), and adversarial.
 taxonomy_category: safety
+tags: [safety, hallucination]
 modality: 2d
 
 source:

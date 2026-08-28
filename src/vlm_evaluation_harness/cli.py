@@ -168,6 +168,11 @@ def compare(
 @app.command("list-benchmarks")
 def list_benchmarks(
     category: str | None = typer.Option(None, "--category", "-c", help="Filter by category"),
+    tags: str | None = typer.Option(
+        None,
+        "--tags",
+        help="Comma-separated tags; a benchmark is included if it has any of them",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
     include_path: list[Path] = typer.Option(
         [], "--include-path", help=_INCLUDE_PATH_HELP
@@ -187,23 +192,32 @@ def list_benchmarks(
     else:
         names = registry.list()
 
+    if tags:
+        wanted = [t.strip() for t in tags.split(",") if t.strip()]
+        tagged = set(registry.list_by_tags(wanted))
+        names = [n for n in names if n in tagged]
+
     if verbose:
         table = Table(box=box.ROUNDED)
         table.add_column("Name", style="cyan")
         table.add_column("Category")
         table.add_column("Modality")
         table.add_column("Task Type")
+        table.add_column("Tags")
         for name in names:
             m = registry.get(name)
-            table.add_row(name, m.taxonomy_category, m.modality, m.task_type)
+            table.add_row(name, m.taxonomy_category, m.modality, m.task_type, ", ".join(m.tags))
         console.print(table)
     else:
+        names_set = set(names)
         by_cat = registry.list_by_category()
         for cat, cat_names in by_cat.items():
+            cat_names = [n for n in cat_names if n in names_set]
+            if not cat_names:
+                continue
             console.print(f"[bold cyan]{cat}[/bold cyan]")
             for n in cat_names:
-                if not category or cat == category:
-                    console.print(f"  {n}")
+                console.print(f"  {n}")
 
 
 @app.command("validate-bench")

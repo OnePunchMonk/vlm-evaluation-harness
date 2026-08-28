@@ -15,6 +15,19 @@ def test_list_benchmarks():
     assert "DemoMC" in result.stdout
 
 
+def test_list_benchmarks_filtered_by_tag():
+    result = runner.invoke(app, ["list-benchmarks", "--tags", "safety"])
+    assert result.exit_code == 0
+    assert "POPE" in result.stdout
+    assert "DemoMC" not in result.stdout
+
+
+def test_list_benchmarks_verbose_shows_tags_column():
+    result = runner.invoke(app, ["list-benchmarks", "--tags", "safety", "--verbose"])
+    assert result.exit_code == 0
+    assert "safety" in result.stdout
+
+
 def test_eval_with_mock_adapter(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))  # isolate ~/.vlm-evaluation-harness/history.jsonl
     result = runner.invoke(

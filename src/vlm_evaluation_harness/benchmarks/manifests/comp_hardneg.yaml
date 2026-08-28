@@ -10,6 +10,7 @@ description: >
   a model actually binds attributes/relations to the right entities rather
   than pattern-matching on bag-of-words caption similarity. Fully offline.
 taxonomy_category: reasoning
+tags: [compositional, hard_negative]
 modality: 2d
 
 source:

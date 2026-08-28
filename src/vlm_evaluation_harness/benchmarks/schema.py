@@ -147,6 +147,9 @@ class BenchmarkManifest:
     task_type: str = "open_ended"
     modality: str = "2d"  # "2d" | "3d" | "text_only"
     taxonomy_category: str = "perception"
+    # Free-form labels for cross-cutting grouping (e.g. "safety",
+    # "compositional") that don't fit the single taxonomy_category axis.
+    tags: list[str] = field(default_factory=list)
     # "generate": sample free text, then extract an answer.
     # "loglikelihood": score each choice by log-probability and pick the best.
     #   Requires an adapter implementing `score_choices`; MC only.
@@ -382,6 +385,7 @@ class BenchmarkManifest:
             task_type=data.get("task_type", "open_ended"),
             modality=data.get("modality", "2d"),
             taxonomy_category=data.get("taxonomy_category", "perception"),
+            tags=list(data.get("tags", [])),
             scoring=data.get("scoring", "generate"),
             fields=fields,
             image_config=image_config,

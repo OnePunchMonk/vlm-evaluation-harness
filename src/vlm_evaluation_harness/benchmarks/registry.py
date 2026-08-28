@@ -80,6 +80,17 @@ class BenchmarkRegistry:
         """Return unique benchmark names (deduplicated)."""
         return sorted({m.name for m in self._manifests.values()})
 
+    def list_by_tags(self, tags: list[str]) -> list[str]:
+        """Benchmark names carrying at least one of `tags`."""
+        wanted = set(tags)
+        return sorted(
+            {
+                m.name
+                for m in {m.name: m for m in self._manifests.values()}.values()
+                if wanted & set(m.tags)
+            }
+        )
+
     def list_by_category(self) -> dict[str, list[str]]:
         """Return benchmark names grouped by taxonomy category."""
         categories: dict[str, list[str]] = {}
