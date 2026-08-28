@@ -1,0 +1,28 @@
+{"id": "hallu_fg_00", "question": "Is there a circle in this image?", "answer": "yes", "image": "images/scene_00.png", "hallu_category": "object"}
+{"id": "hallu_fg_01", "question": "Is there a square in this image?", "answer": "no", "image": "images/scene_00.png", "hallu_category": "object"}
+{"id": "hallu_fg_02", "question": "Is the circle in this image blue?", "answer": "no", "image": "images/scene_00.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_03", "question": "Is the circle in this image green?", "answer": "no", "image": "images/scene_00.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_04", "question": "Is the circle in this image red?", "answer": "yes", "image": "images/scene_00.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_05", "question": "Is the circle in this image yellow?", "answer": "no", "image": "images/scene_00.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_06", "question": "Is there a circle in this image?", "answer": "no", "image": "images/scene_01.png", "hallu_category": "object"}
+{"id": "hallu_fg_07", "question": "Is there a square in this image?", "answer": "yes", "image": "images/scene_01.png", "hallu_category": "object"}
+{"id": "hallu_fg_08", "question": "Is the square in this image blue?", "answer": "yes", "image": "images/scene_01.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_09", "question": "Is the square in this image green?", "answer": "no", "image": "images/scene_01.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_10", "question": "Is the square in this image red?", "answer": "no", "image": "images/scene_01.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_11", "question": "Is the square in this image yellow?", "answer": "no", "image": "images/scene_01.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_12", "question": "Is there a circle in this image?", "answer": "yes", "image": "images/scene_02.png", "hallu_category": "object"}
+{"id": "hallu_fg_13", "question": "Is there a square in this image?", "answer": "yes", "image": "images/scene_02.png", "hallu_category": "object"}
+{"id": "hallu_fg_14", "question": "Is the circle in this image blue?", "answer": "no", "image": "images/scene_02.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_15", "question": "Is the circle in this image green?", "answer": "yes", "image": "images/scene_02.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_16", "question": "Is the circle in this image red?", "answer": "no", "image": "images/scene_02.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_17", "question": "Is the circle in this image yellow?", "answer": "no", "image": "images/scene_02.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_18", "question": "Is the green circle to the left of the yellow square?", "answer": "yes", "image": "images/scene_02.png", "hallu_category": "relation"}
+{"id": "hallu_fg_19", "question": "Is the yellow square to the left of the green circle?", "answer": "no", "image": "images/scene_02.png", "hallu_category": "relation"}
+{"id": "hallu_fg_20", "question": "Is there a circle in this image?", "answer": "yes", "image": "images/scene_03.png", "hallu_category": "object"}
+{"id": "hallu_fg_21", "question": "Is there a square in this image?", "answer": "yes", "image": "images/scene_03.png", "hallu_category": "object"}
+{"id": "hallu_fg_22", "question": "Is the square in this image blue?", "answer": "no", "image": "images/scene_03.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_23", "question": "Is the square in this image green?", "answer": "no", "image": "images/scene_03.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_24", "question": "Is the square in this image red?", "answer": "yes", "image": "images/scene_03.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_25", "question": "Is the square in this image yellow?", "answer": "no", "image": "images/scene_03.png", "hallu_category": "attribute"}
+{"id": "hallu_fg_26", "question": "Is the red square to the left of the blue circle?", "answer": "yes", "image": "images/scene_03.png", "hallu_category": "relation"}
+{"id": "hallu_fg_27", "question": "Is the blue circle to the left of the red square?", "answer": "no", "image": "images/scene_03.png", "hallu_category": "relation"}

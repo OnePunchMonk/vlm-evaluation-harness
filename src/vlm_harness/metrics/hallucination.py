@@ -88,6 +88,66 @@ class POPEMetric:
         return "yes" if lower.startswith("y") else "no"
 
 
+class FineGrainedHallucinationMetric:
+    """Fine-grained hallucination probing, decomposed by failure category.
+
+    Inspired by FIHA/FREAK-style 2026 hallucination benchmarks: rather than
+    one aggregate object-presence number (POPE), probes are tagged by
+    `metadata[category_field] in {object, attribute, relation}` and scored
+    per category, so a model that hallucinates spatial relations but gets
+    object presence right doesn't get averaged into invisibility.
+    """
+
+    def __init__(self, category_field: str = "hallu_category"):
+        self._category_field = category_field
+
+    def compute(self, samples: list[ScoredSample]) -> MetricResult:
+        scorable = [s for s in samples if s.has_reference]
+        if not scorable:
+            return MetricResult(
+                metric_name="fine_grained_hallucination",
+                value=NAN,
+                n_samples=len(samples),
+                n_scored=0,
+            )
+
+        per_sample: dict[str, float] = {}
+        by_category: dict[str, list[float]] = {}
+        for s in scorable:
+            pred = self._normalize(s.prediction)
+            refs = {self._normalize(r) for r in s.references}
+            ref = "yes" if "yes" in refs else "no"
+            # Hallucination rate: 1.0 when the model wrongly claims presence
+            # (says "yes" to a probe whose ground truth is "no"); non-events
+            # (correct or under-claiming) score 0.0.
+            hallucinated = 1.0 if pred == "yes" and ref == "no" else 0.0
+            per_sample[s.sample_id] = hallucinated
+            category = str(s.metadata.get(self._category_field, "unknown"))
+            by_category.setdefault(category, []).append(hallucinated)
+
+        breakdown = {
+            f"{cat}_hallucination_rate": sum(vals) / len(vals)
+            for cat, vals in sorted(by_category.items())
+        }
+        overall = sum(per_sample.values()) / len(per_sample)
+        return MetricResult(
+            metric_name="fine_grained_hallucination",
+            value=overall,
+            breakdown=breakdown,
+            n_samples=len(samples),
+            n_scored=len(scorable),
+            per_sample=per_sample,
+        )
+
+    def _normalize(self, text: str) -> str:
+        lower = text.lower().strip()
+        if re.search(r"\byes\b", lower):
+            return "yes"
+        if re.search(r"\bno\b", lower):
+            return "no"
+        return "yes" if lower.startswith("y") else "no"
+
+
 class CHAIRMetric:
     """Caption Hallucination Assessment with Image Relevance.
 
