@@ -98,6 +98,10 @@ class AnswerExtractionConfig:
     strategy: str = "exact"  # "first_letter" | "regex" | "exact" | "number" | "yes_no" | "json"
     normalize: str = "strip"  # "strip" | "uppercase" | "lowercase" | "vqa" | "none"
     regex_pattern: str | None = None
+    # Ordered post-normalization filters (see parsing/filters.py), applied
+    # after `normalize` for composable cleanup a single normalize mode
+    # doesn't cover. Empty by default — fully backward compatible.
+    filters: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -295,6 +299,15 @@ class BenchmarkManifest:
                 re.compile(self.answer_extraction.regex_pattern)
             except re.error as exc:
                 errors.append(f"invalid regex_pattern: {exc}")
+        if self.answer_extraction.filters:
+            from vlm_evaluation_harness.parsing.filters import FILTERS as _KNOWN_FILTERS
+
+            unknown = [f for f in self.answer_extraction.filters if f not in _KNOWN_FILTERS]
+            if unknown:
+                errors.append(
+                    f"unknown answer_extraction.filters {unknown} "
+                    f"(known: {sorted(_KNOWN_FILTERS)})"
+                )
 
         if self.few_shot.count and self.few_shot.source not in {s.name for s in self.splits}:
             errors.append(
@@ -348,6 +361,7 @@ class BenchmarkManifest:
             strategy=ae_data.get("strategy", "exact"),
             normalize=ae_data.get("normalize", "strip"),
             regex_pattern=ae_data.get("regex_pattern"),
+            filters=list(ae_data.get("filters", [])),
         )
 
         fs_data = data.get("few_shot", {})

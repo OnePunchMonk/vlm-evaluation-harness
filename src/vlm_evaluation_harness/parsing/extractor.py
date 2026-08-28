@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 
 from vlm_evaluation_harness.benchmarks.schema import AnswerExtractionConfig
+from vlm_evaluation_harness.parsing.filters import apply_filters
 from vlm_evaluation_harness.parsing.normalizer import normalize_answer
 
 
@@ -38,6 +39,8 @@ class AnswerExtractor:
             extracted, confident = text.strip(), True
 
         normalized = normalize_answer(extracted, mode=config.normalize)
+        if config.filters:
+            normalized = apply_filters(normalized, config.filters)
         return ExtractionResult(
             raw=text, extracted=extracted, normalized=normalized, confident=confident
         )
