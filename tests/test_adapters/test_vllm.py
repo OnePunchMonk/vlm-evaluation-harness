@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from vlm_evaluation_harness.adapters.vllm import DEFAULT_BASE_URL, VLLMAdapter
+import pytest
+
+pytest.importorskip("openai")
+
+from vlm_evaluation_harness.adapters.vllm import DEFAULT_BASE_URL, VLLMAdapter  # noqa: E402
 
 
 def test_defaults_to_local_vllm_server(monkeypatch):

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from vlm_evaluation_harness.adapters.openai_compatible import OpenAICompatibleAdapter
+pytest.importorskip("openai")
+
+from vlm_evaluation_harness.adapters.openai_compatible import OpenAICompatibleAdapter  # noqa: E402
 
 
 def test_requires_a_base_url(monkeypatch):
