@@ -167,6 +167,75 @@ def build_pareto_svg(
 """
 
 
+_SORT_SCRIPT = """
+function sortTable(table, colIdx) {
+  const tbody = table.tBodies[0];
+  const rows = Array.from(tbody.rows);
+  const asc = table.dataset.sortCol == colIdx && table.dataset.sortDir !== 'asc';
+  const numeric = rows.every(r => !isNaN(parseFloat((r.cells[colIdx].textContent || '').trim())));
+  rows.sort((a, b) => {
+    const av = a.cells[colIdx].textContent.trim();
+    const bv = b.cells[colIdx].textContent.trim();
+    const cmp = numeric ? parseFloat(av) - parseFloat(bv) : av.localeCompare(bv);
+    return asc ? cmp : -cmp;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  table.dataset.sortCol = colIdx;
+  table.dataset.sortDir = asc ? 'asc' : 'desc';
+}
+document.querySelectorAll('table.sortable th').forEach((th, idx) => {
+  th.style.cursor = 'pointer';
+  th.addEventListener('click', () => sortTable(th.closest('table'), idx));
+});
+"""
+
+
+def build_static_leaderboard_html(
+    results: list[dict], title: str = "VLM-Evaluation-Harness Leaderboard"
+) -> str:
+    """A publishable static site: one sortable table per benchmark, all in a
+    single self-contained HTML file (no separate CSS/JS assets, vanilla JS,
+    no new dependency)."""
+    by_benchmark: dict[str, list[dict]] = {}
+    for r in results:
+        by_benchmark.setdefault(r.get("benchmark", "unknown"), []).append(r)
+
+    sections = ""
+    for bench in sorted(by_benchmark):
+        metric_cols, rows = _leaderboard_rows(by_benchmark[bench])
+        header = "".join(f"<th>{m}</th>" for m in metric_cols)
+        sections += f"""
+<h2>{bench}</h2>
+<table class="sortable">
+  <tr><th>Model</th><th>Benchmark</th>{header}<th>Cost</th><th>N</th></tr>
+  {rows}
+</table>
+"""
+
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>{title}</title><style>{_STYLE}</style></head>
+<body>
+<h1>{title}</h1>
+<div class="meta">{len(results)} run(s) across {len(by_benchmark)} benchmark(s). Click a column
+header to sort.</div>
+{sections}
+<script>{_SORT_SCRIPT}</script>
+</body>
+</html>"""
+
+
+def save_static_leaderboard_html(
+    results: list[dict],
+    path: str | Path = "leaderboard.html",
+    title: str = "VLM-Evaluation-Harness Leaderboard",
+) -> Path:
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(build_static_leaderboard_html(results, title))
+    return out_path
+
+
 def build_regression_html(deltas: list, threshold: float = 0.03) -> str:
     if not deltas:
         return ""

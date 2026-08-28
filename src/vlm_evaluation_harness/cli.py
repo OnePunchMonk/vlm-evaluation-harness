@@ -576,5 +576,61 @@ def pareto(
     console.print(f"[green]Pareto plot saved to {output}[/green] ({len(results)} run(s))")
 
 
+@app.command()
+def leaderboard(
+    results_dir: Path = typer.Option(
+        ..., "--results-dir", help="Directory of saved *_results.json files"
+    ),
+    output: Path = typer.Option(Path("leaderboard.html"), "--output", "-o"),
+):
+    """Build a publishable static leaderboard site: one sortable table per benchmark."""
+    import json
+
+    from vlm_evaluation_harness.reporting.html import save_static_leaderboard_html
+
+    result_files = sorted(results_dir.glob("*_results.json"))
+    if not result_files:
+        console.print(f"[yellow]No *_results.json files found in {results_dir}[/yellow]")
+        raise typer.Exit(1)
+
+    results = [json.loads(f.read_text()) for f in result_files]
+    path = save_static_leaderboard_html(results, path=output)
+    console.print(f"[green]Static leaderboard saved to {path}[/green] ({len(results)} run(s))")
+
+
+@app.command("push-results")
+def push_results(
+    results_file: Path = typer.Argument(..., help="A saved *_results.json file to upload"),
+    repo: str = typer.Option(..., "--repo", help="HF Hub dataset repo id, e.g. 'org/my-results'"),
+    path_in_repo: str | None = typer.Option(
+        None, "--path-in-repo", help="Destination path in the repo (defaults to the file name)"
+    ),
+):
+    """Push a results JSON file to a Hugging Face Hub dataset repo (requires HF_TOKEN)."""
+    import os
+
+    token = os.environ.get("HF_TOKEN")
+    if not token:
+        console.print("[red]HF_TOKEN environment variable is not set.[/red]")
+        raise typer.Exit(1)
+    if not results_file.exists():
+        console.print(f"[red]No such file: {results_file}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        from huggingface_hub import HfApi
+    except ImportError as e:
+        console.print(f"[red]huggingface_hub is not installed: {e}[/red]")
+        raise typer.Exit(1) from e
+
+    HfApi(token=token).upload_file(
+        path_or_fileobj=str(results_file),
+        path_in_repo=path_in_repo or results_file.name,
+        repo_id=repo,
+        repo_type="dataset",
+    )
+    console.print(f"[green]Pushed {results_file} to {repo}[/green]")
+
+
 if __name__ == "__main__":
     app()
