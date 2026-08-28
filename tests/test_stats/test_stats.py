@@ -2,7 +2,7 @@
 
 import math
 
-from vlm_harness.stats import bootstrap_ci, bootstrap_delta_ci, mcnemar, wilson_interval
+from vlm_evaluation_harness.stats import bootstrap_ci, bootstrap_delta_ci, mcnemar, wilson_interval
 
 
 def test_mcnemar_no_discordant_pairs():

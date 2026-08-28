@@ -1,8 +1,8 @@
 """End-to-end test of the generative eval pipeline using the offline mock T2I
 adapter and the zero-dependency judge-only benchmark (GenJudgeMini)."""
 
-from vlm_harness.adapters.generative.mock import MockT2IAdapter
-from vlm_harness.engine.generative_runner import GenerativeEvalRunner, GenEvalConfig
+from vlm_evaluation_harness.adapters.generative.mock import MockT2IAdapter
+from vlm_evaluation_harness.engine.generative_runner import GenerativeEvalRunner, GenEvalConfig
 
 
 def test_full_offline_generative_run(tmp_path):

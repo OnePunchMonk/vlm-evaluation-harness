@@ -2,7 +2,7 @@
 
 from typer.testing import CliRunner
 
-from vlm_harness.cli import app
+from vlm_evaluation_harness.cli import app
 
 runner = CliRunner()
 
@@ -14,7 +14,7 @@ def test_list_benchmarks():
 
 
 def test_eval_with_mock_adapter(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path))  # isolate ~/.vlm-harness/history.jsonl
+    monkeypatch.setenv("HOME", str(tmp_path))  # isolate ~/.vlm-evaluation-harness/history.jsonl
     result = runner.invoke(
         app,
         ["eval", "--model", "mock:demo-v1", "--bench", "demo_mc", "--split", "validation"],

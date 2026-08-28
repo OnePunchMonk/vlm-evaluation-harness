@@ -1,4 +1,4 @@
-# VLM-Harness: A Unified Evaluation Framework for Vision Language Models
+# VLM-Evaluation-Harness: A Unified Evaluation Framework for Vision Language Models
 
 ## 1. Problem Statement
 
@@ -14,13 +14,13 @@ The Vision Language Model (VLM) ecosystem is growing rapidly. Models like GPT-4o
 
 - **Safety and robustness are afterthoughts.** Bias in visual descriptions, susceptibility to adversarial visual prompts, and calibration of refusal behavior are rarely tested alongside capability benchmarks.
 
-VLM-Harness is a framework designed to solve these problems.
+VLM-Evaluation-Harness is a framework designed to solve these problems.
 
 ---
 
 ## 2. Vision
 
-**VLM-Harness is the pytest of VLM evaluation** --- minimal, composable, and extensible. It provides:
+**VLM-Evaluation-Harness is the pytest of VLM evaluation** --- minimal, composable, and extensible. It provides:
 
 1. A universal model adapter interface that works with any VLM, whether it's a cloud API or a local checkpoint.
 2. A declarative benchmark registry where adding a new benchmark is a YAML file, not a Python module.
@@ -179,17 +179,17 @@ cross_modal:
 
 ### 4.1 Design Philosophy: Extension, Not Fork
 
-VLM-Harness does not exist in a vacuum. EleutherAI's `lm-evaluation-harness` is the de facto standard for text LLM evaluation, with a mature codebase, extensive benchmark coverage, and a large contributor community. Rather than rebuilding everything from scratch, VLM-Harness is designed as a **complementary extension** that reuses battle-tested components for the language dimension and adds purpose-built machinery for the visual dimension.
+VLM-Evaluation-Harness does not exist in a vacuum. EleutherAI's `lm-evaluation-harness` is the de facto standard for text LLM evaluation, with a mature codebase, extensive benchmark coverage, and a large contributor community. Rather than rebuilding everything from scratch, VLM-Evaluation-Harness is designed as a **complementary extension** that reuses battle-tested components for the language dimension and adds purpose-built machinery for the visual dimension.
 
 The relationship follows the principle: **reuse the text pipeline, extend with vision.**
 
 ### 4.2 Components to Reuse from lm-evaluation-harness
 
-| Component | What it provides | How VLM-Harness uses it |
+| Component | What it provides | How VLM-Evaluation-Harness uses it |
 |---|---|---|
 | **Text metrics** (exact_match, F1, BLEU, ROUGE, perplexity) | Well-tested, edge-case-hardened implementations of standard NLP metrics | Import directly as a dependency. No reason to rewrite string F1 or token-level BLEU. |
 | **Answer extraction / normalization** | Regex-based extractors for multiple choice letters, numbers, yes/no, and free-form text. Handles edge cases like "The answer is B" vs. "B" vs. "(B)" | Reuse the extraction logic and extend it with vision-specific parsers (bounding box, region description, structured visual output). |
-| **Few-shot example selection** | Strategies for selecting and formatting in-context examples (random, balanced, similar) | The sampling strategies are modality-agnostic. VLM-Harness adds image handling to the example rendering. |
+| **Few-shot example selection** | Strategies for selecting and formatting in-context examples (random, balanced, similar) | The sampling strategies are modality-agnostic. VLM-Evaluation-Harness adds image handling to the example rendering. |
 | **Task grouping and suite management** | How individual benchmarks compose into suites, how results aggregate across groups | Adopt the same grouping semantics and extend with vision-specific taxonomy (perception, reasoning, 3D, cross-modal). |
 | **Result serialization and logging** | Structured JSON output, per-sample predictions, aggregated metrics | Use the same output schema for text metrics. Extend with vision-specific fields (image hashes, cost, hallucination scores). |
 | **Configuration system** | YAML-based task configuration, override system, CLI argument parsing | Adopt the config patterns and extend the schema with image pipeline, multi-modal, and 3D fields. |
@@ -221,21 +221,21 @@ from lm_eval.api.metrics import mean, weighted_perplexity
 from lm_eval.filters.extraction import RegexFilter, MapFilter
 
 # 3. Extend the task definition format
-# lm-eval uses YAML task configs --- VLM-Harness adds image_config,
+# lm-eval uses YAML task configs --- VLM-Evaluation-Harness adds image_config,
 # cross_modal, modality, and 3d-specific fields to the same schema.
 
 # 4. Wrap the LM interface with vision support
 # The VLMAdapter Protocol extends the concept of lm_eval.api.model.LM
-# by adding image parameters. For text-only benchmarks within VLM-Harness,
+# by adding image parameters. For text-only benchmarks within VLM-Evaluation-Harness,
 # the adapter delegates to the underlying LM interface.
 
 # 5. Share result format
-# VLM-Harness results are a superset of lm-eval results, so tools built
-# for lm-eval output (leaderboards, dashboards) can consume VLM-Harness
+# VLM-Evaluation-Harness results are a superset of lm-eval results, so tools built
+# for lm-eval output (leaderboards, dashboards) can consume VLM-Evaluation-Harness
 # results for text metrics.
 ```
 
-This approach gives VLM-Harness immediate access to the ~400 text-only tasks in lm-evaluation-harness. Researchers can run a combined evaluation: "evaluate this VLM on MMMU (vision), ScanQA (3D), Winoground (cross-modal), and MMLU (text-only) in one command" --- using lm-eval's text pipeline for the text benchmarks and VLM-Harness's vision pipeline for the rest.
+This approach gives VLM-Evaluation-Harness immediate access to the ~400 text-only tasks in lm-evaluation-harness. Researchers can run a combined evaluation: "evaluate this VLM on MMMU (vision), ScanQA (3D), Winoground (cross-modal), and MMLU (text-only) in one command" --- using lm-eval's text pipeline for the text benchmarks and VLM-Evaluation-Harness's vision pipeline for the rest.
 
 ### 4.5 What This Means for the Language Aspect of VLM Evaluation
 
@@ -253,7 +253,7 @@ VLMs don't just need vision evaluation --- they also need to maintain strong lan
 
 ```
                    ┌──────────────────────────────────────────────────────────┐
-                   │                      VLM-Harness                        │
+                   │                      VLM-Evaluation-Harness                        │
                    │                                                          │
 ┌───────────┐     │  ┌───────────┐   ┌───────────┐   ┌──────────────────┐   │
 │ Benchmark  │────▶│  │  Prompt   │──▶│   Model   │──▶│     Response     │   │
@@ -483,7 +483,7 @@ The expected workflow for adding a new benchmark:
 
 1. Create a YAML file in `benchmarks/`.
 2. Optionally add a custom answer extractor if the default strategies don't work.
-3. Run `vlm-harness validate-bench --bench my_new_bench` to verify the manifest.
+3. Run `vlm-evaluation-harness validate-bench --bench my_new_bench` to verify the manifest.
 4. Submit a PR (or keep it local).
 
 No Python code required for the common case. For benchmarks with unusual scoring logic (e.g., CIDEr for captioning), a small Python scoring plugin can be registered.
@@ -621,23 +621,23 @@ Running a benchmark with `--robustness-probe` generates a performance-vs-corrupt
 ```bash
 # ── Evaluation ──────────────────────────────────────────────────────
 # Evaluate a single model on a single benchmark
-vlm-harness eval \
+vlm-evaluation-harness eval \
   --model anthropic:claude-opus-4-6 \
   --bench mmmu \
   --split validation
 
 # Evaluate on multiple benchmarks
-vlm-harness eval \
+vlm-evaluation-harness eval \
   --model openai:gpt-4o \
   --bench mmmu,chartqa,docvqa,textvqa
 
 # Evaluate on a predefined suite
-vlm-harness eval \
+vlm-evaluation-harness eval \
   --model google:gemini-2.5-pro \
   --suite perception          # Runs all perception-category benchmarks
 
 # Evaluate a local model
-vlm-harness eval \
+vlm-evaluation-harness eval \
   --model huggingface:liuhaotian/llava-v1.6-34b \
   --bench vqav2 \
   --device cuda:0 \
@@ -645,26 +645,26 @@ vlm-harness eval \
 
 # ── Comparison ──────────────────────────────────────────────────────
 # Compare multiple models on one benchmark
-vlm-harness compare \
+vlm-evaluation-harness compare \
   --models anthropic:claude-opus-4-6,openai:gpt-4o,google:gemini-2.5-pro \
   --bench mmmu \
   --output comparison.html
 
 # ── Hallucination ───────────────────────────────────────────────────
 # Run the dedicated hallucination evaluation suite
-vlm-harness eval \
+vlm-evaluation-harness eval \
   --model anthropic:claude-opus-4-6 \
   --suite hallucination
 
 # ── Safety ──────────────────────────────────────────────────────────
 # Run the safety suite
-vlm-harness eval \
+vlm-evaluation-harness eval \
   --model local:llava-next \
   --suite safety
 
 # ── Robustness ──────────────────────────────────────────────────────
 # Run with automatic image corruption probes
-vlm-harness eval \
+vlm-evaluation-harness eval \
   --model openai:gpt-4o \
   --bench vqav2 \
   --robustness-probe \
@@ -672,42 +672,42 @@ vlm-harness eval \
 
 # ── Benchmark Management ────────────────────────────────────────────
 # List all available benchmarks
-vlm-harness list-benchmarks
+vlm-evaluation-harness list-benchmarks
 
 # Validate a benchmark manifest
-vlm-harness validate-bench --bench my_custom_bench
+vlm-evaluation-harness validate-bench --bench my_custom_bench
 
 # Add a benchmark from HuggingFace
-vlm-harness add-bench --from hf://lmms-lab/SEED-Bench-2
+vlm-evaluation-harness add-bench --from hf://lmms-lab/SEED-Bench-2
 
 # Download benchmark data
-vlm-harness download --bench mmmu --split validation
+vlm-evaluation-harness download --bench mmmu --split validation
 
 # ── Reporting ───────────────────────────────────────────────────────
 # Generate a detailed report from saved results
-vlm-harness report --results-dir ./results --format html
+vlm-evaluation-harness report --results-dir ./results --format html
 
 # Serve an interactive leaderboard
-vlm-harness serve --results-dir ./results --port 8080
+vlm-evaluation-harness serve --results-dir ./results --port 8080
 
 # ── Utilities ───────────────────────────────────────────────────────
 # Estimate the cost of an evaluation run before executing it
-vlm-harness estimate-cost \
+vlm-evaluation-harness estimate-cost \
   --model anthropic:claude-opus-4-6 \
   --bench mmmu \
   --split validation
 
 # Reproduce a prior run from its manifest
-vlm-harness reproduce --manifest results/mmmu_claude_20260413/manifest.json
+vlm-evaluation-harness reproduce --manifest results/mmmu_claude_20260413/manifest.json
 ```
 
 ### 9.2 Configuration File
 
-Global defaults can be set in `~/.vlm-harness/config.yaml`:
+Global defaults can be set in `~/.vlm-evaluation-harness/config.yaml`:
 
 ```yaml
 default_output_dir: ./results
-cache_dir: ~/.vlm-harness/cache
+cache_dir: ~/.vlm-evaluation-harness/cache
 
 # API keys (or use environment variables)
 api_keys:
@@ -873,13 +873,13 @@ Reproducibility is a core design goal. Every evaluation run produces a manifest 
 }
 ```
 
-The `vlm-harness reproduce` command re-runs an evaluation from a manifest file, verifying that all inputs (images, prompts, model config) match the original run.
+The `vlm-evaluation-harness reproduce` command re-runs an evaluation from a manifest file, verifying that all inputs (images, prompts, model config) match the original run.
 
 ---
 
 ## 13. Differentiation from Existing Tools
 
-| Tool | Strengths | Gaps that VLM-Harness fills |
+| Tool | Strengths | Gaps that VLM-Evaluation-Harness fills |
 |---|---|---|
 | **lm-evaluation-harness** (EleutherAI) | De facto standard for text LLM eval | Image support is minimal and bolted-on; no VLM-specific metrics |
 | **lmms-eval** | Good benchmark coverage for VLMs | Tightly coupled to HuggingFace Transformers; weak API model support; no cost tracking; complex codebase |
@@ -888,7 +888,7 @@ The `vlm-harness reproduce` command re-runs an evaluation from a manifest file, 
 | **HELM** (Stanford) | Rigorous methodology | Slow to add new benchmarks; limited VLM support |
 | **simple-evals** (OpenAI) | Clean, minimal | Very limited benchmark set; single-provider focus |
 
-**VLM-Harness differentiators:**
+**VLM-Evaluation-Harness differentiators:**
 
 1. **Benchmark-as-YAML**: Adding a new benchmark should take minutes, not hours.
 2. **Provider-agnostic**: First-class support for all major API providers and local inference engines.
@@ -923,13 +923,13 @@ Benchmarks like MMMU-test, MMBench-test, and others require submitting predictio
 
 A natural extension is a public or private leaderboard that aggregates results across models and benchmarks.
 
-**Recommendation**: Ship a local `vlm-harness serve` command for private leaderboards in v1. A hosted public leaderboard is a v2 feature that requires community infrastructure.
+**Recommendation**: Ship a local `vlm-evaluation-harness serve` command for private leaderboards in v1. A hosted public leaderboard is a v2 feature that requires community infrastructure.
 
 ### 14.5 Continuous Evaluation
 
 For model providers, running evaluations on every model update is essential. Integration with CI/CD pipelines (GitHub Actions, etc.) would enable automated regression detection.
 
-**Recommendation**: Provide a `vlm-harness ci` command that runs a configurable eval suite and exits with a non-zero code if any metric drops below a threshold. This enables simple CI integration without building a full CI framework.
+**Recommendation**: Provide a `vlm-evaluation-harness ci` command that runs a configurable eval suite and exits with a non-zero code if any metric drops below a threshold. This enables simple CI integration without building a full CI framework.
 
 ---
 
@@ -977,7 +977,7 @@ For model providers, running evaluations on every model update is essential. Int
 
 - Video benchmark support
 - Multi-turn / agentic evaluation support
-- CI integration (`vlm-harness ci`)
+- CI integration (`vlm-evaluation-harness ci`)
 - Community benchmark contributions
 - Public leaderboard (if demand warrants)
 - Plugin system for custom metrics and adapters
@@ -989,13 +989,13 @@ For model providers, running evaluations on every model update is essential. Int
 ## 16. Project Structure
 
 ```
-vlm-harness/
+vlm-evaluation-harness/
 ├── README.md
 ├── pyproject.toml
 ├── LICENSE                        # Apache 2.0
 │
 ├── src/
-│   └── vlm_harness/
+│   └── vlm_evaluation_harness/
 │       ├── __init__.py
 │       ├── cli.py                 # CLI entry point (click/typer)
 │       ├── config.py              # Configuration loading and validation
@@ -1110,7 +1110,7 @@ vlm-harness/
 
 ## 17. Summary
 
-VLM-Harness aims to become the standard evaluation framework for Vision Language Models by solving the biggest pain points in the current ecosystem:
+VLM-Evaluation-Harness aims to become the standard evaluation framework for Vision Language Models by solving the biggest pain points in the current ecosystem:
 
 1. **Fragmentation** --- one framework, any model, any benchmark.
 2. **Inconsistency** --- declarative benchmarks with reproducibility manifests eliminate methodology variance.
@@ -1118,4 +1118,4 @@ VLM-Harness aims to become the standard evaluation framework for Vision Language
 4. **Missing dimensions** --- 3D vision and true cross-modal reasoning are first-class evaluation categories, not afterthoughts.
 5. **Reinventing the wheel** --- the language evaluation backbone is inherited from lm-evaluation-harness, not rebuilt from scratch.
 
-The design prioritizes extensibility (YAML benchmarks, adapter protocol), practicality (cost tracking, CLI-first), rigor (reproducibility manifests, robustness probes), and completeness (2D + 3D + cross-modal + text regression). By building on the shoulders of lm-evaluation-harness and extending into the visual domain with purpose-built machinery, VLM-Harness shifts researcher time from evaluation infrastructure to actual research.
+The design prioritizes extensibility (YAML benchmarks, adapter protocol), practicality (cost tracking, CLI-first), rigor (reproducibility manifests, robustness probes), and completeness (2D + 3D + cross-modal + text regression). By building on the shoulders of lm-evaluation-harness and extending into the visual domain with purpose-built machinery, VLM-Evaluation-Harness shifts researcher time from evaluation infrastructure to actual research.

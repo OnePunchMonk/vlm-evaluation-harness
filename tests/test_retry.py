@@ -2,7 +2,7 @@
 
 import pytest
 
-from vlm_harness.retry import is_transient, with_retries
+from vlm_evaluation_harness.retry import is_transient, with_retries
 
 
 def test_is_transient_detects_rate_limit():

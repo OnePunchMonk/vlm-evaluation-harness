@@ -1,6 +1,6 @@
 """Tests for the offline text-to-image mock adapter."""
 
-from vlm_harness.adapters.generative.mock import MockT2IAdapter
+from vlm_evaluation_harness.adapters.generative.mock import MockT2IAdapter
 
 
 def test_renders_requested_count_color_shape():

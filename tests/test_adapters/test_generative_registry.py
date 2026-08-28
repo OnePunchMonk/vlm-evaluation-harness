@@ -2,7 +2,7 @@
 
 import pytest
 
-from vlm_harness.adapters.generative.registry import get_t2i_adapter, list_t2i_adapters
+from vlm_evaluation_harness.adapters.generative.registry import get_t2i_adapter, list_t2i_adapters
 
 
 def test_list_adapters_returns_dict():

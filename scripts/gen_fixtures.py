@@ -1,6 +1,6 @@
 """One-off generator for the comp_hardneg / hallu_fg / calib_deflect offline
 fixtures. Not part of the installed package — run manually to (re)produce the
-fixture images + jsonl under src/vlm_harness/benchmarks/fixtures/.
+fixture images + jsonl under src/vlm_evaluation_harness/benchmarks/fixtures/.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
-FIXTURES = ROOT / "src" / "vlm_harness" / "benchmarks" / "fixtures"
+FIXTURES = ROOT / "src" / "vlm_evaluation_harness" / "benchmarks" / "fixtures"
 
 COLORS = {
     "red": (220, 40, 40),

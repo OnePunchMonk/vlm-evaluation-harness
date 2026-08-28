@@ -1,6 +1,6 @@
 """Tests for adapter base types."""
 
-from vlm_harness.adapters.base import ConversationTurn, VLMResponse
+from vlm_evaluation_harness.adapters.base import ConversationTurn, VLMResponse
 
 
 def test_vlm_response_total_tokens():

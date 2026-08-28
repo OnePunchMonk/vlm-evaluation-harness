@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "vlm-harness"
+name = "vlm-evaluation-harness"
 version = "0.2.0"
 description = "A unified evaluation framework for Vision Language Models"
 readme = "README.md"
@@ -48,14 +48,14 @@ dev = [
     "mypy>=1.10.0",
 ]
 all = [
-    "vlm-harness[anthropic,openai,huggingface,metrics,generative]",
+    "vlm-evaluation-harness[anthropic,openai,huggingface,metrics,generative]",
 ]
 
 [project.scripts]
-vlm-harness = "vlm_harness.cli:app"
+vlm-evaluation-harness = "vlm_evaluation_harness.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/vlm_harness"]
+packages = ["src/vlm_evaluation_harness"]
 
 [tool.ruff]
 src = ["src"]

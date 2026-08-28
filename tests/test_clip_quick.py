@@ -64,7 +64,7 @@ SAMPLES = [
 
 def run():
     print("=" * 60)
-    print("CLIP Zero-Shot Classification — VLM-Harness Quick Test")
+    print("CLIP Zero-Shot Classification — VLM-Evaluation-Harness Quick Test")
     print("=" * 60)
 
     # ── Load model ────────────────────────────────────────────────────────────
@@ -109,8 +109,8 @@ def run():
 
     # ── Harness metrics ───────────────────────────────────────────────────────
     print("\n[3/4] Computing harness metrics ...")
-    from vlm_harness.metrics.accuracy import AccuracyMetric
-    from vlm_harness.metrics.nlp import F1Metric
+    from vlm_evaluation_harness.metrics.accuracy import AccuracyMetric
+    from vlm_evaluation_harness.metrics.nlp import F1Metric
 
     acc_result = AccuracyMetric().compute(predictions, references, [{} for _ in predictions])
     f1_result  = F1Metric().compute(predictions, references, [{} for _ in predictions])

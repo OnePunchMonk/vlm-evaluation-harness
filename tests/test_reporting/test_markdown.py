@@ -1,12 +1,12 @@
 """Tests for the Markdown report generator."""
 
-from vlm_harness.reporting.markdown import (
+from vlm_evaluation_harness.reporting.markdown import (
     build_leaderboard_markdown,
     build_regression_markdown,
     build_report_markdown,
 )
-from vlm_harness.tracking.history import HistoryEntry
-from vlm_harness.tracking.regression import compare_entries
+from vlm_evaluation_harness.tracking.history import HistoryEntry
+from vlm_evaluation_harness.tracking.regression import compare_entries
 
 _RESULTS = [
     {"model": "mock:v1", "benchmark": "DemoMC", "metrics": {"accuracy": 0.5},

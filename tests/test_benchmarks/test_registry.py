@@ -2,7 +2,7 @@
 
 import pytest
 
-from vlm_harness.benchmarks.registry import BenchmarkRegistry
+from vlm_evaluation_harness.benchmarks.registry import BenchmarkRegistry
 
 
 def test_registry_loads_builtins():

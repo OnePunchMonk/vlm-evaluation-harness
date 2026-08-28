@@ -1,6 +1,6 @@
 """Tests for the offline discriminative mock adapter."""
 
-from vlm_harness.adapters.mock import MockAdapter
+from vlm_evaluation_harness.adapters.mock import MockAdapter
 
 
 def test_answers_multiple_choice_with_an_offered_letter():

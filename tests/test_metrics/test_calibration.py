@@ -1,7 +1,7 @@
 """Tests for the refusal-calibration metric."""
 
-from vlm_harness.metrics.base import ScoredSample
-from vlm_harness.metrics.calibration import CalibrationMetric
+from vlm_evaluation_harness.metrics.base import ScoredSample
+from vlm_evaluation_harness.metrics.calibration import CalibrationMetric
 
 
 class TestCalibration:

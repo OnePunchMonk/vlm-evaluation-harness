@@ -1,6 +1,6 @@
 """Tests for the run history store."""
 
-from vlm_harness.tracking.history import HistoryStore
+from vlm_evaluation_harness.tracking.history import HistoryStore
 
 
 def test_record_and_query_roundtrip(tmp_path):

@@ -1,8 +1,8 @@
 """Tests for the self-contained HTML report generator."""
 
-from vlm_harness.reporting.html import build_leaderboard_html, save_html_report
-from vlm_harness.tracking.history import HistoryEntry
-from vlm_harness.tracking.regression import compare_entries
+from vlm_evaluation_harness.reporting.html import build_leaderboard_html, save_html_report
+from vlm_evaluation_harness.tracking.history import HistoryEntry
+from vlm_evaluation_harness.tracking.regression import compare_entries
 
 _RESULTS = [
     {"model": "mock:v1", "benchmark": "DemoMC", "metrics": {"accuracy": 0.5},

@@ -2,7 +2,7 @@
 
 from PIL import Image
 
-from vlm_harness.metrics.generative.judge import LLMJudgeMetric, VQAScoreMetric
+from vlm_evaluation_harness.metrics.generative.judge import LLMJudgeMetric, VQAScoreMetric
 
 
 def test_judge_produces_score_in_range():

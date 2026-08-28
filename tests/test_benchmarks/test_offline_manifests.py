@@ -1,6 +1,6 @@
 """Tests for the offline demo/fixture benchmarks (no network or API keys)."""
 
-from vlm_harness.benchmarks.registry import get_registry
+from vlm_evaluation_harness.benchmarks.registry import get_registry
 
 
 def test_all_offline_manifests_load():
@@ -15,7 +15,7 @@ def test_all_offline_manifests_load():
 
 
 def test_demo_mc_loads_local_fixture_images():
-    from vlm_harness.benchmarks.loader import BenchmarkLoader
+    from vlm_evaluation_harness.benchmarks.loader import BenchmarkLoader
 
     registry = get_registry()
     manifest = registry.get("demo_mc")
@@ -30,7 +30,7 @@ def test_demo_mc_loads_local_fixture_images():
 
 
 def test_geneval_mini_loads_structured_checks():
-    from vlm_harness.benchmarks.loader import BenchmarkLoader
+    from vlm_evaluation_harness.benchmarks.loader import BenchmarkLoader
 
     registry = get_registry()
     manifest = registry.get("geneval_mini")
@@ -46,8 +46,8 @@ def test_geneval_mini_loads_structured_checks():
 
 
 def test_full_offline_discriminative_run():
-    from vlm_harness.adapters.mock import MockAdapter
-    from vlm_harness.engine.runner import EvalConfig, EvalRunner
+    from vlm_evaluation_harness.adapters.mock import MockAdapter
+    from vlm_evaluation_harness.engine.runner import EvalConfig, EvalRunner
 
     adapter = MockAdapter(model_id="offline-demo")
     runner = EvalRunner(adapter)
@@ -78,7 +78,7 @@ def test_winoground_prompt_resolves_all_placeholders():
 
 
 def test_comp_hardneg_loads_four_way_choices():
-    from vlm_harness.benchmarks.loader import BenchmarkLoader
+    from vlm_evaluation_harness.benchmarks.loader import BenchmarkLoader
 
     registry = get_registry()
     manifest = registry.get("comp_hardneg")
@@ -94,7 +94,7 @@ def test_comp_hardneg_loads_four_way_choices():
 
 
 def test_hallu_fg_loads_category_metadata():
-    from vlm_harness.benchmarks.loader import BenchmarkLoader
+    from vlm_evaluation_harness.benchmarks.loader import BenchmarkLoader
 
     registry = get_registry()
     manifest = registry.get("hallu_fg")
@@ -109,7 +109,7 @@ def test_hallu_fg_loads_category_metadata():
 
 
 def test_calib_deflect_loads_answerable_flag():
-    from vlm_harness.benchmarks.loader import BenchmarkLoader
+    from vlm_evaluation_harness.benchmarks.loader import BenchmarkLoader
 
     registry = get_registry()
     manifest = registry.get("calib_deflect")
@@ -125,8 +125,8 @@ def test_comp_hardneg_hallu_fg_calib_deflect_run_offline():
     """End-to-end smoke test for all three new benchmarks against the mock
     adapter — proves the manifest + fixture + metric wiring is consistent,
     not just that the YAML parses."""
-    from vlm_harness.adapters.mock import MockAdapter
-    from vlm_harness.engine.runner import EvalConfig, EvalRunner
+    from vlm_evaluation_harness.adapters.mock import MockAdapter
+    from vlm_evaluation_harness.engine.runner import EvalConfig, EvalRunner
 
     for bench in ("comp_hardneg", "hallu_fg", "calib_deflect"):
         adapter = MockAdapter(model_id="offline-demo")

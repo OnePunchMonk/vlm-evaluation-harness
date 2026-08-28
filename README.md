@@ -1,4 +1,4 @@
-# VLM-Harness
+# VLM-Evaluation-Harness
 
 A unified evaluation framework for Vision Language Models — covering both
 **discriminative** tasks (VQA, multiple-choice, hallucination probes: image+text in,
@@ -19,36 +19,36 @@ built-in mock adapters.
 pip install -e .
 
 # Discriminative: image -> text, scored against ground truth
-vlm-harness eval --model mock:demo-v1 --bench demo_mc
+vlm-evaluation-harness eval --model mock:demo-v1 --bench demo_mc
 
 # Generative: text -> image, scored by an LLM-judge (no torch needed)
-vlm-harness gen-eval --model mock:t2i-v1 --bench genjudge_mini
+vlm-evaluation-harness gen-eval --model mock:t2i-v1 --bench genjudge_mini
 
-# Every tracked run is appended to ~/.vlm-harness/history.jsonl, with
+# Every tracked run is appended to ~/.vlm-evaluation-harness/history.jsonl, with
 # per-sample scores stored alongside it for paired significance testing
-vlm-harness history
+vlm-evaluation-harness history
 
 # Diff the latest tracked runs of two models. When both runs have per-sample
 # scores this is a paired McNemar test + bootstrap CI, not a raw threshold.
-vlm-harness regression --baseline mock:demo-v1 --current mock:demo-v2
+vlm-evaluation-harness regression --baseline mock:demo-v1 --current mock:demo-v2
 
 # Aggregate saved *_results.json files into one HTML/Markdown report
-vlm-harness eval --model mock:demo-v1 --bench demo_mc --output-dir results/
-vlm-harness report --results-dir results/ --output report.html
+vlm-evaluation-harness eval --model mock:demo-v1 --bench demo_mc --output-dir results/
+vlm-evaluation-harness report --results-dir results/ --output report.html
 ```
 
 ## Real backends
 
 ```bash
 pip install -e ".[anthropic]"
-vlm-harness eval --model anthropic:claude-opus-4-6 --bench mmmu --split validation
+vlm-evaluation-harness eval --model anthropic:claude-opus-4-6 --bench mmmu --split validation
 
 pip install -e ".[openai]"
-vlm-harness gen-eval --model openai:gpt-image-1 --bench geneval_mini
+vlm-evaluation-harness gen-eval --model openai:gpt-image-1 --bench geneval_mini
 
 pip install -e ".[generative]"   # torch + transformers + diffusers, for
                                   # local T2I inference and CLIP-based metrics
-vlm-harness gen-eval --model diffusers:stabilityai/stable-diffusion-2-1 --bench geneval_mini
+vlm-evaluation-harness gen-eval --model diffusers:stabilityai/stable-diffusion-2-1 --bench geneval_mini
 ```
 
 Only providers with a real adapter implementation are registered:
@@ -94,8 +94,8 @@ so they run with zero network access or API keys, same as `demo_mc`/`pope`;
 swap in a full dataset by changing `source:` in the manifest once you have
 one to point at.
 
-Run `vlm-harness list-benchmarks --verbose` for the live list, or
-`vlm-harness validate-bench --bench <name>` to check a manifest.
+Run `vlm-evaluation-harness list-benchmarks --verbose` for the live list, or
+`vlm-evaluation-harness validate-bench --bench <name>` to check a manifest.
 
 Every built-in manifest is structurally validated at registry load time:
 unresolvable prompt-template placeholders, a scorable split with no
@@ -124,10 +124,10 @@ A few decisions worth knowing about before you compare numbers across runs:
   not a single canonical string.
 - **Every result records its provenance**: decoding params, prompt template,
   image-pipeline config, applied corruptions, and a content hash of the
-  manifest file used. `vlm-harness reproduce <results.json>` replays a run
+  manifest file used. `vlm-evaluation-harness reproduce <results.json>` replays a run
   from that provenance rather than today's CLI defaults.
 - **Responses are cached** by a hash of (model, rendered prompt, image
-  hashes, decoding params) in `~/.vlm-harness/cache/responses.sqlite`. A run
+  hashes, decoding params) in `~/.vlm-evaluation-harness/cache/responses.sqlite`. A run
   that crashes at sample 800 of 900 resumes for free; re-running the same
   config costs nothing. Disable with `--no-cache`.
 - **`--max-concurrent N`** runs samples through a thread pool while keeping
@@ -151,13 +151,13 @@ A few decisions worth knowing about before you compare numbers across runs:
   gets a distinct cache key, so a resumed run doesn't replay the same cached
   call N times:
   ```bash
-  vlm-harness eval --model anthropic:claude-opus-4-6 --bench comp_hardneg \
+  vlm-evaluation-harness eval --model anthropic:claude-opus-4-6 --bench comp_hardneg \
     --temperature 0.7 --self-consistency 5
   ```
 
 ## Regression tracking
 
-`vlm-harness regression --baseline A --current B` diffs the latest tracked
+`vlm-evaluation-harness regression --baseline A --current B` diffs the latest tracked
 run of each model per benchmark. When both runs recorded per-sample scores
 (the default since 0.2.0), each metric is compared with a **paired McNemar
 test** — did the same samples flip from right to wrong — plus a bootstrap
@@ -193,7 +193,7 @@ the previous magnitude-threshold behavior, and the CLI says so explicitly.
   `reporting/markdown.py` all work off the same plain-dict result shape, so a
   report can mix discriminative and generative runs in one leaderboard.
 
-Adding a benchmark is a YAML file (see `src/vlm_harness/benchmarks/manifests/`);
+Adding a benchmark is a YAML file (see `src/vlm_evaluation_harness/benchmarks/manifests/`);
 adding a model backend is one adapter class implementing `VLMAdapter` (and
 optionally `ChoiceScoringAdapter`) or `T2IAdapter`.
 

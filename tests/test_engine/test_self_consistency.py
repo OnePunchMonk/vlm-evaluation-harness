@@ -15,8 +15,8 @@ from __future__ import annotations
 import random
 import re
 
-from vlm_harness.adapters.base import VLMResponse
-from vlm_harness.engine.runner import EvalConfig, EvalRunner
+from vlm_evaluation_harness.adapters.base import VLMResponse
+from vlm_evaluation_harness.engine.runner import EvalConfig, EvalRunner
 
 _COLOR_TO_LETTER = {
     "red": "A",

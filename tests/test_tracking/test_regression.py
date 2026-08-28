@@ -1,7 +1,7 @@
 """Tests for regression detection and severity classification."""
 
-from vlm_harness.tracking.history import HistoryEntry
-from vlm_harness.tracking.regression import compare_entries, compare_models
+from vlm_evaluation_harness.tracking.history import HistoryEntry
+from vlm_evaluation_harness.tracking.regression import compare_entries, compare_models
 
 
 def _entry(model, benchmark, metrics):
@@ -60,7 +60,7 @@ def test_sorted_worst_first():
 
 
 def test_compare_models_uses_latest_tracked_runs(tmp_path):
-    from vlm_harness.tracking.history import HistoryStore
+    from vlm_evaluation_harness.tracking.history import HistoryStore
 
     store = HistoryStore(path=tmp_path / "history.jsonl")
     store.record(model="base", benchmark="X", split="s", metrics={"accuracy": 0.9}, n_samples=1)
@@ -73,7 +73,7 @@ def test_compare_models_uses_latest_tracked_runs(tmp_path):
 
 
 def test_compare_models_skips_benchmarks_missing_from_either_side(tmp_path):
-    from vlm_harness.tracking.history import HistoryStore
+    from vlm_evaluation_harness.tracking.history import HistoryStore
 
     store = HistoryStore(path=tmp_path / "history.jsonl")
     store.record(model="base", benchmark="X", split="s", metrics={"accuracy": 0.9}, n_samples=1)

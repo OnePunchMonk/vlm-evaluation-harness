@@ -1,6 +1,6 @@
 """Tests for the content-addressed response cache."""
 
-from vlm_harness.cache import ResponseCache, response_key
+from vlm_evaluation_harness.cache import ResponseCache, response_key
 
 
 def test_response_key_is_stable():

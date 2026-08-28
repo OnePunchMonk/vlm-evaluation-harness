@@ -3,8 +3,8 @@
 import pytest
 from PIL import Image
 
-from vlm_harness.images.corruption import CORRUPTION_NAMES, apply_corruption
-from vlm_harness.images.pipeline import ImagePipeline, ImagePipelineConfig
+from vlm_evaluation_harness.images.corruption import CORRUPTION_NAMES, apply_corruption
+from vlm_evaluation_harness.images.pipeline import ImagePipeline, ImagePipelineConfig
 
 
 def make_image(w=512, h=512, color=(128, 64, 200)):

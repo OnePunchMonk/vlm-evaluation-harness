@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip("scipy")
 
-from vlm_harness.metrics.generative.fid import compute_fid, frechet_distance
+from vlm_evaluation_harness.metrics.generative.fid import compute_fid, frechet_distance
 
 
 def test_identical_distributions_have_zero_fid():

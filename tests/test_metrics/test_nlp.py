@@ -2,8 +2,8 @@
 
 import math
 
-from vlm_harness.metrics.base import ScoredSample
-from vlm_harness.metrics.nlp import ANLSMetric, F1Metric, RougeMetric
+from vlm_evaluation_harness.metrics.base import ScoredSample
+from vlm_evaluation_harness.metrics.nlp import ANLSMetric, F1Metric, RougeMetric
 
 
 def one(prediction, reference):

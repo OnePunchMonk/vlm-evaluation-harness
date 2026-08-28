@@ -3,7 +3,7 @@ scoring a benchmark whose manifest can never produce a real number."""
 
 import pytest
 
-from vlm_harness.benchmarks.schema import BenchmarkManifest, ManifestError, MetricConfig
+from vlm_evaluation_harness.benchmarks.schema import BenchmarkManifest, ManifestError, MetricConfig
 
 
 def _base_manifest(**overrides):

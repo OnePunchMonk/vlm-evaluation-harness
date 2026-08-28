@@ -1,7 +1,7 @@
 """Tests for hallucination metrics."""
 
-from vlm_harness.metrics.base import ScoredSample
-from vlm_harness.metrics.hallucination import (
+from vlm_evaluation_harness.metrics.base import ScoredSample
+from vlm_evaluation_harness.metrics.hallucination import (
     CHAIRMetric,
     FineGrainedHallucinationMetric,
     POPEMetric,
