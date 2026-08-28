@@ -543,5 +543,38 @@ def report(
     console.print(f"[green]Report saved to {output}[/green] ({len(results)} run(s))")
 
 
+@app.command()
+def pareto(
+    results_dir: Path = typer.Option(
+        ..., "--results-dir", help="Directory of saved *_results.json files"
+    ),
+    metric: str = typer.Option(..., "--metric", help="Metric name to plot on the y-axis"),
+    x_field: str = typer.Option(
+        "latency.p50_ms",
+        "--x-field",
+        help="Dotted field for the x-axis, e.g. 'cost.total_usd' or 'latency.p50_ms'",
+    ),
+    output: Path = typer.Option(Path("pareto.html"), "--output", "-o"),
+):
+    """Plot cost/latency vs. accuracy across saved runs and highlight the Pareto frontier."""
+    import json
+
+    from vlm_evaluation_harness.reporting.html import build_pareto_svg
+
+    result_files = sorted(results_dir.glob("*_results.json"))
+    if not result_files:
+        console.print(f"[yellow]No *_results.json files found in {results_dir}[/yellow]")
+        raise typer.Exit(1)
+
+    results = [json.loads(f.read_text()) for f in result_files]
+    svg = build_pareto_svg(results, metric_name=metric, x_field=x_field)
+    output.write_text(
+        f'<!DOCTYPE html><html><head><meta charset="utf-8">'
+        f"<title>Pareto: {metric} vs {x_field}</title></head>"
+        f"<body>{svg}</body></html>"
+    )
+    console.print(f"[green]Pareto plot saved to {output}[/green] ({len(results)} run(s))")
+
+
 if __name__ == "__main__":
     app()

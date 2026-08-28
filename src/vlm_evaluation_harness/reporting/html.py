@@ -79,6 +79,94 @@ def build_leaderboard_html(
 """
 
 
+def build_pareto_svg(
+    results: list[dict],
+    metric_name: str,
+    x_field: str = "latency.p50_ms",
+    width: int = 640,
+    height: int = 420,
+) -> str:
+    """Hand-rolled SVG scatter of `metric_name` (y) vs. a cost/latency field
+    (x, dotted path e.g. "cost.total_usd" or "latency.p50_ms"). Points on the
+    Pareto frontier (no other model is both cheaper/faster AND better) are
+    highlighted and connected. No plotting dependency: this project already
+    keeps `stats.py` numpy-only, so a scatter plot earns a hand-rolled SVG
+    rather than a new dependency.
+    """
+    x_keys = x_field.split(".")
+    points = []
+    for r in results:
+        y = r.get("metrics", {}).get(metric_name)
+        x: object = r
+        for key in x_keys:
+            x = x.get(key) if isinstance(x, dict) else None
+        if y is None or x is None or (isinstance(y, float) and y != y):
+            continue
+        points.append((float(x), float(y), r.get("model", "")))
+
+    margin = 56
+    if not points:
+        return (
+            f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">'
+            f'<text x="{margin}" y="{height // 2}">No comparable points for '
+            f'"{metric_name}" vs "{x_field}".</text></svg>'
+        )
+
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+    x_span = (x_max - x_min) or 1.0
+    y_span = (y_max - y_min) or 1.0
+
+    def sx(x: float) -> float:
+        return margin + (x - x_min) / x_span * (width - 2 * margin)
+
+    def sy(y: float) -> float:
+        return height - margin - (y - y_min) / y_span * (height - 2 * margin)
+
+    # Pareto frontier: lower x (cheaper/faster) is better, higher y (metric)
+    # is better. A point is on the frontier if no other point is both <= its
+    # x and >= its y with at least one strict inequality.
+    frontier = []
+    for x, y, model in points:
+        dominated = any(
+            (ox <= x and oy >= y) and (ox < x or oy > y) for ox, oy, _ in points
+        )
+        if not dominated:
+            frontier.append((x, y, model))
+    frontier.sort(key=lambda p: p[0])
+
+    circles = "".join(
+        f'<circle cx="{sx(x):.1f}" cy="{sy(y):.1f}" r="5" '
+        f'fill="{"#ff8800" if (x, y, model) in frontier else "#888"}">'
+        f"<title>{model}: {metric_name}={y:.4f}, {x_field}={x:.4g}</title></circle>"
+        for x, y, model in points
+    )
+    frontier_path = " ".join(f"{sx(x):.1f},{sy(y):.1f}" for x, y, _ in frontier)
+    polyline = (
+        f'<polyline points="{frontier_path}" fill="none" stroke="#ff8800" '
+        f'stroke-width="1.5" stroke-dasharray="4,3"/>'
+        if len(frontier) > 1
+        else ""
+    )
+
+    return f"""
+<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg"
+     font-family="-apple-system, sans-serif" font-size="11">
+  <rect x="0" y="0" width="{width}" height="{height}" fill="none"/>
+  <line x1="{margin}" y1="{height - margin}" x2="{width - margin}" y2="{height - margin}"
+        stroke="#ccc"/>
+  <line x1="{margin}" y1="{margin}" x2="{margin}" y2="{height - margin}" stroke="#ccc"/>
+  <text x="{width / 2:.1f}" y="{height - 12}" text-anchor="middle">{x_field}</text>
+  <text x="14" y="{height / 2:.1f}" text-anchor="middle"
+        transform="rotate(-90 14 {height / 2:.1f})">{metric_name}</text>
+  {polyline}
+  {circles}
+</svg>
+"""
+
+
 def build_regression_html(deltas: list, threshold: float = 0.03) -> str:
     if not deltas:
         return ""
