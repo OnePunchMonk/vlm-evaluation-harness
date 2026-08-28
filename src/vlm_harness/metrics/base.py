@@ -135,7 +135,12 @@ def compute_metrics(samples: list[ScoredSample], metric_configs: list) -> list[M
         RelaxedAccuracyMetric,
         VQAAccuracyMetric,
     )
-    from vlm_harness.metrics.hallucination import CHAIRMetric, POPEMetric
+    from vlm_harness.metrics.calibration import CalibrationMetric
+    from vlm_harness.metrics.hallucination import (
+        CHAIRMetric,
+        FineGrainedHallucinationMetric,
+        POPEMetric,
+    )
     from vlm_harness.metrics.nlp import ANLSMetric, BLEUMetric, F1Metric, RougeMetric
 
     results: list[MetricResult] = []
@@ -168,6 +173,16 @@ def compute_metrics(samples: list[ScoredSample], metric_configs: list) -> list[M
             if not cfg.objects_field:
                 raise ValueError("metric 'chair' requires objects_field")
             results.append(CHAIRMetric(cfg.objects_field).compute(samples))
+        elif cfg.type == "fine_grained_hallucination":
+            results.append(
+                FineGrainedHallucinationMetric(cfg.field_name or "hallu_category").compute(
+                    samples
+                )
+            )
+        elif cfg.type == "calibration":
+            results.append(
+                CalibrationMetric(cfg.field_name or "answerable").compute(samples)
+            )
         else:
             raise ValueError(f"Unknown metric type: {cfg.type!r}")
 

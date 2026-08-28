@@ -75,3 +75,65 @@ def test_winoground_prompt_resolves_all_placeholders():
     manifest = registry.get("winoground")
     missing = manifest.template_variables() - manifest.available_variables()
     assert missing == set()
+
+
+def test_comp_hardneg_loads_four_way_choices():
+    from vlm_harness.benchmarks.loader import BenchmarkLoader
+
+    registry = get_registry()
+    manifest = registry.get("comp_hardneg")
+    loader = BenchmarkLoader()
+    samples = list(loader.load(manifest, split="validation"))
+
+    assert len(samples) == 8
+    for s in samples:
+        choices = s.text_fields["choices"]
+        assert len(choices) == 4
+        assert len(set(choices)) == 4  # correct + 3 distinct hard negatives
+        assert s.references and s.references[0] in {"A", "B", "C", "D"}
+
+
+def test_hallu_fg_loads_category_metadata():
+    from vlm_harness.benchmarks.loader import BenchmarkLoader
+
+    registry = get_registry()
+    manifest = registry.get("hallu_fg")
+    loader = BenchmarkLoader()
+    samples = list(loader.load(manifest, split="validation"))
+
+    assert samples
+    categories = {s.metadata["hallu_category"] for s in samples}
+    assert categories == {"object", "attribute", "relation"}
+    for s in samples:
+        assert s.references[0] in {"yes", "no"}
+
+
+def test_calib_deflect_loads_answerable_flag():
+    from vlm_harness.benchmarks.loader import BenchmarkLoader
+
+    registry = get_registry()
+    manifest = registry.get("calib_deflect")
+    loader = BenchmarkLoader()
+    samples = list(loader.load(manifest, split="validation"))
+
+    assert samples
+    answerable_flags = {s.metadata["answerable"] for s in samples}
+    assert answerable_flags == {True, False}
+
+
+def test_comp_hardneg_hallu_fg_calib_deflect_run_offline():
+    """End-to-end smoke test for all three new benchmarks against the mock
+    adapter — proves the manifest + fixture + metric wiring is consistent,
+    not just that the YAML parses."""
+    from vlm_harness.adapters.mock import MockAdapter
+    from vlm_harness.engine.runner import EvalConfig, EvalRunner
+
+    for bench in ("comp_hardneg", "hallu_fg", "calib_deflect"):
+        adapter = MockAdapter(model_id="offline-demo")
+        runner = EvalRunner(adapter)
+        config = EvalConfig(
+            model_spec="mock:offline-demo", benchmark=bench, split="validation", use_cache=False
+        )
+        result = runner.run(config)
+        assert result.sample_results
+        assert result.metrics

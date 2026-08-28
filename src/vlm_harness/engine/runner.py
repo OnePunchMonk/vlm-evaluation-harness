@@ -56,6 +56,12 @@ class EvalConfig:
     cache_path: Path | None = None
     # Fail the run if more than this fraction of samples error out.
     max_error_rate: float = 0.1
+    # Self-consistency (Wang et al.): sample the model N times at
+    # `temperature` and majority-vote the extracted answers, instead of
+    # trusting a single greedy/sampled generation. N=1 (default) is today's
+    # single-call behavior, unchanged. Only applies to `scoring: generate`
+    # benchmarks — loglikelihood scoring is already exact, not sampled.
+    self_consistency_n: int = 1
 
 
 @dataclass
@@ -509,39 +515,63 @@ class EvalRunner:
                 formatted, sample_id, references, metadata or sample.metadata, image_hashes
             )
 
-        params = {
-            "max_tokens": config.max_tokens,
-            "temperature": config.temperature,
-            "mode": "generate",
-        }
-        key = response_key(
-            self._adapter.model_id, formatted.text, formatted.system, image_hashes, params
-        )
-        cached_payload = cache.get(key)
-        if cached_payload is not None:
-            response = VLMResponse.from_cache_payload(cached_payload)
-        else:
-            response = self._adapter.generate(
-                images=formatted.images,
-                prompt=formatted.text,
-                system=formatted.system,
-                max_tokens=config.max_tokens,
-                temperature=config.temperature,
+        n_samples = max(1, config.self_consistency_n)
+        responses: list[VLMResponse] = []
+        extractions: list = []
+        for i in range(n_samples):
+            params = {
+                "max_tokens": config.max_tokens,
+                "temperature": config.temperature,
+                "mode": "generate",
+            }
+            if n_samples > 1:
+                # Distinct cache key per vote: with temperature > 0 these are
+                # meant to be independent samples, not the same cached call
+                # replayed N times.
+                params["self_consistency_index"] = i
+            key = response_key(
+                self._adapter.model_id, formatted.text, formatted.system, image_hashes, params
             )
-            cache.put(key, self._adapter.model_id, response.to_cache_payload())
+            cached_payload = cache.get(key)
+            if cached_payload is not None:
+                response = VLMResponse.from_cache_payload(cached_payload)
+            else:
+                response = self._adapter.generate(
+                    images=formatted.images,
+                    prompt=formatted.text,
+                    system=formatted.system,
+                    max_tokens=config.max_tokens,
+                    temperature=config.temperature,
+                )
+                cache.put(key, self._adapter.model_id, response.to_cache_payload())
+            responses.append(response)
+            extractions.append(self._extractor.extract(response.text, manifest.answer_extraction))
 
-        extraction = self._extractor.extract(response.text, manifest.answer_extraction)
+        if n_samples == 1:
+            winner = extractions[0]
+            confident = winner.confident
+        else:
+            votes: dict[str, int] = {}
+            first_seen: dict[str, int] = {}
+            for i, ext in enumerate(extractions):
+                votes[ext.normalized] = votes.get(ext.normalized, 0) + 1
+                first_seen.setdefault(ext.normalized, i)
+            best = max(votes, key=lambda v: (votes[v], -first_seen[v]))
+            winner = next(e for e in extractions if e.normalized == best)
+            # Confident only when the winning answer took a strict majority
+            # of the N votes — a 2-2-1 split isn't consensus.
+            confident = votes[best] > n_samples / 2
 
         return SampleResult(
             sample_id=sample_id,
-            prediction=extraction.normalized,
+            prediction=winner.normalized,
             references=self._normalize_references(references, manifest),
-            raw_output=response.text,
-            confident=extraction.confident,
-            input_tokens=response.input_tokens,
-            output_tokens=response.output_tokens,
-            latency_ms=response.latency_ms,
-            cached=response.cached,
+            raw_output=responses[-1].text,
+            confident=confident,
+            input_tokens=sum(r.input_tokens for r in responses),
+            output_tokens=sum(r.output_tokens for r in responses),
+            latency_ms=sum(r.latency_ms for r in responses),
+            cached=all(r.cached for r in responses),
             image_hashes=image_hashes,
             metadata=metadata if metadata is not None else sample.metadata,
         )
