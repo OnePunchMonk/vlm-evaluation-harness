@@ -14,6 +14,11 @@ app = typer.Typer(
 )
 console = Console()
 
+_INCLUDE_PATH_HELP = (
+    "Extra directory of benchmark manifest YAMLs, searched in addition to "
+    "the built-in ones. May be passed more than once."
+)
+
 
 @app.command()
 def eval(
@@ -24,6 +29,9 @@ def eval(
     max_tokens: int = typer.Option(1024, "--max-tokens"),
     temperature: float = typer.Option(0.0, "--temperature"),
     max_concurrent: int = typer.Option(1, "--max-concurrent", help="Parallel in-flight requests"),
+    seed: int = typer.Option(
+        42, "--seed", help="Seed for random/numpy/torch, for reproducible sampling and ordering"
+    ),
     output_dir: Path | None = typer.Option(None, "--output-dir", "-o"),
     corruptions: str | None = typer.Option(
         None, "--corruptions", help="Comma-sep image corruptions for robustness probing"
@@ -44,13 +52,32 @@ def eval(
             "single-call behavior; use with --temperature > 0."
         ),
     ),
+    log_samples: bool = typer.Option(
+        True,
+        "--log-samples/--no-log-samples",
+        help="Include per-sample predictions/scores in the saved results JSON",
+    ),
+    predict_only: bool = typer.Option(
+        False,
+        "--predict-only",
+        help="Generate model outputs but skip metric scoring (no ground-truth comparison)",
+    ),
+    system: str | None = typer.Option(
+        None, "--system", help="System instruction sent to the model, if the adapter supports it"
+    ),
+    include_path: list[Path] = typer.Option(
+        [], "--include-path", help=_INCLUDE_PATH_HELP
+    ),
 ):
     """Evaluate a model on one or more benchmarks."""
     from vlm_evaluation_harness.adapters.registry import get_adapter
+    from vlm_evaluation_harness.benchmarks.registry import get_registry
     from vlm_evaluation_harness.engine.runner import EvalConfig, EvalRunner
     from vlm_evaluation_harness.reporting.terminal import print_results
     from vlm_evaluation_harness.tracking import HistoryStore
 
+    if include_path:
+        get_registry(extra_dirs=include_path)
     adapter = get_adapter(model)
     runner = EvalRunner(adapter)
     benchmarks = [b.strip() for b in bench.split(",")]
@@ -65,6 +92,7 @@ def eval(
             max_tokens=max_tokens,
             temperature=temperature,
             max_concurrent=max_concurrent,
+            seed=seed,
             output_dir=output_dir,
             robustness_corruptions=(
                 [c.strip() for c in corruptions.split(",")] if corruptions else []
@@ -72,6 +100,9 @@ def eval(
             corruption_severity=corruption_severity,
             use_cache=use_cache,
             self_consistency_n=self_consistency,
+            log_samples=log_samples,
+            predict_only=predict_only,
+            system_prompt_override=system,
         )
         result = runner.run(config)
         print_results(result)
@@ -86,6 +117,15 @@ def compare(
     split: str = typer.Option("validation", "--split"),
     max_samples: int | None = typer.Option(None, "--max-samples"),
     output: Path | None = typer.Option(None, "--output", "-o", help="Save HTML comparison"),
+    rank: bool = typer.Option(
+        False,
+        "--rank",
+        help=(
+            "Also print a significance-aware ranking: models are grouped into "
+            "tiers by a paired McNemar test on per-sample scores, not sorted "
+            "by raw value alone."
+        ),
+    ),
 ):
     """Compare multiple models on a benchmark."""
     from vlm_evaluation_harness.adapters.registry import get_adapter
@@ -109,6 +149,15 @@ def compare(
 
     print_comparison(results, bench)
 
+    if rank:
+        from vlm_evaluation_harness.reporting.ranking import rank_eval_results
+
+        ranked = rank_eval_results(results)
+        if ranked:
+            console.print("\n[bold]Significance-aware ranking:[/bold]")
+            for r in ranked:
+                console.print(f"  Tier {r.tier}: {r.model} ({r.value:.4f})")
+
     if output:
         path = save_html_report(
             [r.to_dict() for r in results], title=f"Model Comparison — {bench}", path=output
@@ -120,6 +169,9 @@ def compare(
 def list_benchmarks(
     category: str | None = typer.Option(None, "--category", "-c", help="Filter by category"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
+    include_path: list[Path] = typer.Option(
+        [], "--include-path", help=_INCLUDE_PATH_HELP
+    ),
 ):
     """List all available benchmarks."""
     from rich import box
@@ -127,7 +179,7 @@ def list_benchmarks(
 
     from vlm_evaluation_harness.benchmarks.registry import get_registry
 
-    registry = get_registry()
+    registry = get_registry(extra_dirs=include_path or None)
 
     if category:
         by_cat = registry.list_by_category()
@@ -157,6 +209,9 @@ def list_benchmarks(
 @app.command("validate-bench")
 def validate_bench(
     bench: str = typer.Option(..., "--bench", "-b"),
+    include_path: list[Path] = typer.Option(
+        [], "--include-path", help=_INCLUDE_PATH_HELP
+    ),
 ):
     """Validate a benchmark manifest.
 
@@ -170,7 +225,7 @@ def validate_bench(
     from vlm_evaluation_harness.benchmarks.schema import ManifestError
 
     try:
-        registry = get_registry()
+        registry = get_registry(extra_dirs=include_path or None)
         manifest = registry.get(bench)
         console.print(f"[green]✓[/green] Manifest for '{manifest.name}' is valid.")
         console.print(f"  Task type: {manifest.task_type}")
@@ -295,13 +350,29 @@ def gen_eval(
     seed: int | None = typer.Option(42, "--seed"),
     output_dir: Path | None = typer.Option(None, "--output-dir", "-o"),
     track: bool = typer.Option(True, "--track/--no-track", help="Record this run to local history"),
+    log_samples: bool = typer.Option(
+        True,
+        "--log-samples/--no-log-samples",
+        help="Include per-sample predictions/scores in the saved results JSON",
+    ),
+    predict_only: bool = typer.Option(
+        False,
+        "--predict-only",
+        help="Generate images but skip metric scoring (CLIPScore/judge/FID etc.)",
+    ),
+    include_path: list[Path] = typer.Option(
+        [], "--include-path", help=_INCLUDE_PATH_HELP
+    ),
 ):
     """Evaluate a text-to-image model on one or more generative benchmarks."""
     from vlm_evaluation_harness.adapters.generative.registry import get_t2i_adapter
+    from vlm_evaluation_harness.benchmarks.registry import get_registry
     from vlm_evaluation_harness.engine.generative_runner import GenerativeEvalRunner, GenEvalConfig
     from vlm_evaluation_harness.reporting.terminal import print_results
     from vlm_evaluation_harness.tracking import HistoryStore
 
+    if include_path:
+        get_registry(extra_dirs=include_path)
     adapter = get_t2i_adapter(model)
     runner = GenerativeEvalRunner(adapter)
     benchmarks = [b.strip() for b in bench.split(",")]
@@ -317,6 +388,8 @@ def gen_eval(
             height=height,
             seed=seed,
             output_dir=output_dir,
+            log_samples=log_samples,
+            predict_only=predict_only,
         )
         result = runner.run(config)
         print_results(result)

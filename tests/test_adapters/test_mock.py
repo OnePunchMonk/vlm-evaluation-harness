@@ -13,6 +13,13 @@ def test_answers_multiple_choice_with_an_offered_letter():
     assert response.text in {"A", "B", "C"}
 
 
+def test_generate_records_system_instruction():
+    adapter = MockAdapter(model_id="test-v1")
+    assert adapter.last_system is None
+    adapter.generate(images=[], prompt="hello", system="You are terse.")
+    assert adapter.last_system == "You are terse."
+
+
 def test_deterministic_for_same_model_and_prompt():
     adapter = MockAdapter(model_id="test-v1")
     prompt = "Options:\nA. Yes\nB. No\n"

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import math
 import platform
+import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
@@ -25,9 +27,33 @@ from vlm_evaluation_harness.metrics.base import MetricResult, ScoredSample, comp
 from vlm_evaluation_harness.metrics.cost import CostTracker
 from vlm_evaluation_harness.parsing.extractor import AnswerExtractor
 from vlm_evaluation_harness.prompt.formatter import PromptFormatter
+from vlm_evaluation_harness.seeding import seed_everything
 from vlm_evaluation_harness.stats import bootstrap_ci
 
-HARNESS_VERSION = "0.2.0"
+
+def _harness_version() -> str:
+    try:
+        return importlib.metadata.version("vlm-evaluation-harness")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def _harness_sha() -> str | None:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+HARNESS_VERSION = _harness_version()
+RESULTS_SCHEMA_VERSION = "1.0"
 
 
 class EvalError(RuntimeError):
@@ -62,6 +88,18 @@ class EvalConfig:
     # single-call behavior, unchanged. Only applies to `scoring: generate`
     # benchmarks — loglikelihood scoring is already exact, not sampled.
     self_consistency_n: int = 1
+    # Whether the saved results JSON includes the full per-sample "samples"
+    # array (predictions, raw output, per-sample scores). On by default,
+    # matching the harness's historical behavior; turn off to shrink output
+    # files for large runs.
+    log_samples: bool = True
+    # Run generation and populate raw model outputs, but skip metric scoring
+    # entirely (no ground-truth comparison). Useful to produce predictions
+    # for later/offline scoring, or when a split has no ground truth yet.
+    predict_only: bool = False
+    # Overrides the benchmark manifest's system_prompt for every sample, if
+    # set. None (default) leaves the manifest's own system prompt untouched.
+    system_prompt_override: str | None = None
 
 
 @dataclass
@@ -150,34 +188,35 @@ class EvalResult:
         """Per-sample score for every metric that produces one."""
         return {m.metric_name: m.per_sample for m in self.metrics if m.per_sample}
 
-    def save(self, output_dir: Path) -> Path:
+    def save(self, output_dir: Path, log_samples: bool = True) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         slug = f"{self.manifest.name.lower()}_{ts}"
         result_file = output_dir / f"{slug}_results.json"
 
-        per_sample = self.per_sample_scores()
         full = self.to_dict()
-        full["samples"] = [
-            {
-                "id": s.sample_id,
-                "prediction": s.prediction,
-                "references": s.references,
-                "raw_output": s.raw_output,
-                "scores": {
-                    name: scores[s.sample_id]
-                    for name, scores in per_sample.items()
-                    if s.sample_id in scores
-                },
-                "confident": s.confident,
-                "cached": s.cached,
-                "latency_ms": s.latency_ms,
-                "image_hashes": s.image_hashes,
-                "metadata": s.metadata,
-                "error": s.error,
-            }
-            for s in self.sample_results
-        ]
+        if log_samples:
+            per_sample = self.per_sample_scores()
+            full["samples"] = [
+                {
+                    "id": s.sample_id,
+                    "prediction": s.prediction,
+                    "references": s.references,
+                    "raw_output": s.raw_output,
+                    "scores": {
+                        name: scores[s.sample_id]
+                        for name, scores in per_sample.items()
+                        if s.sample_id in scores
+                    },
+                    "confident": s.confident,
+                    "cached": s.cached,
+                    "latency_ms": s.latency_ms,
+                    "image_hashes": s.image_hashes,
+                    "metadata": s.metadata,
+                    "error": s.error,
+                }
+                for s in self.sample_results
+            ]
         result_file.write_text(json.dumps(full, indent=2, default=str))
         return result_file
 
@@ -194,6 +233,7 @@ class EvalRunner:
         self._image_pipeline = ImagePipeline(self._image_config)
 
     def run(self, config: EvalConfig) -> EvalResult:
+        seed_everything(config.seed)
         registry = get_registry()
         manifest = registry.get(config.benchmark)
 
@@ -265,7 +305,7 @@ class EvalRunner:
             if r.error is None
         ]
 
-        if split_config.scorable:
+        if split_config.scorable and not config.predict_only:
             metrics = compute_metrics(scored, manifest.metrics)
             if all(math.isnan(m.value) for m in metrics):
                 raise EvalError(
@@ -287,7 +327,7 @@ class EvalRunner:
         )
 
         if config.output_dir:
-            saved_path = result.save(config.output_dir)
+            saved_path = result.save(config.output_dir, log_samples=config.log_samples)
             print(f"Results saved to {saved_path}")
 
         return result
@@ -309,7 +349,9 @@ class EvalRunner:
         defeats the purpose of tracking them over time.
         """
         return {
+            "results_schema_version": RESULTS_SCHEMA_VERSION,
             "harness_version": HARNESS_VERSION,
+            "harness_sha": _harness_sha(),
             "python": sys.version.split()[0],
             "platform": platform.platform(),
             "model_spec": config.model_spec,
@@ -326,7 +368,8 @@ class EvalRunner:
             "prompt": {
                 "template": manifest.prompt_template,
                 "template_b": manifest.prompt_template_b,
-                "system": manifest.system_prompt,
+                "system": config.system_prompt_override or manifest.system_prompt,
+                "system_override": config.system_prompt_override is not None,
                 "few_shot_count": len(few_shot),
                 "answer_extraction": asdict(manifest.answer_extraction),
             },
@@ -509,6 +552,8 @@ class EvalRunner:
         formatted = self._formatter.format(
             manifest, images, sample.text_fields, few_shot_examples=few_shot, template=template
         )
+        if config.system_prompt_override is not None:
+            formatted.system = config.system_prompt_override
 
         if manifest.scoring == "loglikelihood":
             return self._eval_loglikelihood(

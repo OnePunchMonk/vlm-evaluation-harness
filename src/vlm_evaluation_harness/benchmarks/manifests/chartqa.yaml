@@ -1,4 +1,5 @@
 name: ChartQA
+schema_version: "1.0"
 version: "1.0"
 description: >
   Chart Question Answering. Questions about charts and plots requiring

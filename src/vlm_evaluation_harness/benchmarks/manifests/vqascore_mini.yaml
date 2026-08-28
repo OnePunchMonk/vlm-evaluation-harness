@@ -1,4 +1,5 @@
 name: VQAScoreMini
+schema_version: "1.0"
 version: "1.0"
 description: >
   Same open-ended prompt set as ClipScoreMini, scored via VQAScore instead

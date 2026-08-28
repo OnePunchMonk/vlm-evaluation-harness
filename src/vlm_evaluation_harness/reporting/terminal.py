@@ -15,13 +15,17 @@ def print_results(result) -> None:
     console.rule(f"[bold cyan]{result.manifest.name}[/bold cyan] — {result.config.model_spec}")
 
     # Metrics table
+    cis = result.metric_confidence_intervals()
     table = Table(box=box.ROUNDED, show_header=True, header_style="bold")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", justify="right", style="green")
+    table.add_column("95% CI", justify="right", style="dim")
     table.add_column("N Scored", justify="right")
 
     for m in result.metrics:
-        table.add_row(m.metric_name, f"{m.value:.4f}", f"{m.n_scored}/{m.n_samples}")
+        ci = cis.get(m.metric_name)
+        ci_str = f"[{ci[0]:.4f}, {ci[1]:.4f}]" if ci and ci[0] == ci[0] else "—"
+        table.add_row(m.metric_name, f"{m.value:.4f}", ci_str, f"{m.n_scored}/{m.n_samples}")
 
     console.print(table)
 

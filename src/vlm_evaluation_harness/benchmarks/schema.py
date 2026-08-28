@@ -44,6 +44,9 @@ KNOWN_TASK_TYPES = {
 
 KNOWN_SCORING_MODES = {"generate", "loglikelihood"}
 
+# Manifest schema (format) versions this loader knows how to read.
+SUPPORTED_SCHEMA_VERSIONS = {"1.0"}
+
 
 class ManifestError(ValueError):
     """Raised when a benchmark manifest is structurally invalid."""
@@ -133,6 +136,12 @@ class BenchmarkManifest:
     source: SourceConfig
     splits: list[SplitConfig]
 
+    # Manifest *format* version — distinct from `version` below, which is
+    # the benchmark's own content version. Bumped only when a manifest field
+    # is renamed/removed in a way older loaders can't parse; the loader
+    # rejects any schema_version it doesn't know how to read, rather than
+    # silently misinterpreting a manifest written for a newer format.
+    schema_version: str = "1.0"
     version: str = "1.0"
     description: str = ""
     task_type: str = "open_ended"
@@ -191,6 +200,11 @@ class BenchmarkManifest:
         """
         errors: list[str] = []
 
+        if self.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+            errors.append(
+                f"unsupported manifest schema_version {self.schema_version!r} "
+                f"(this harness supports: {sorted(SUPPORTED_SCHEMA_VERSIONS)})"
+            )
         if self.source.type not in {"huggingface", "local"}:
             errors.append(f"unsupported source.type {self.source.type!r}")
         if not self.splits:
@@ -362,6 +376,7 @@ class BenchmarkManifest:
             name=data["name"],
             source=source,
             splits=splits,
+            schema_version=str(data.get("schema_version", "1.0")),
             version=str(data.get("version", "1.0")),
             description=data.get("description", ""),
             task_type=data.get("task_type", "open_ended"),

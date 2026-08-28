@@ -21,6 +21,10 @@ class MockAdapter:
 
     def __init__(self, model_id: str = "demo"):
         self._model_id = model_id
+        # Records the last `system` instruction seen by generate(), so tests
+        # can verify it was actually threaded through from CLI -> config ->
+        # prompt formatter -> adapter call, not just accepted and dropped.
+        self.last_system: str | None = None
 
     @property
     def model_id(self) -> str:
@@ -55,6 +59,7 @@ class MockAdapter:
         max_tokens: int = 1024,
         temperature: float = 0.0,
     ) -> VLMResponse:
+        self.last_system = system
         t0 = time.perf_counter()
         text = self._respond(prompt)
         latency_ms = (time.perf_counter() - t0) * 1000

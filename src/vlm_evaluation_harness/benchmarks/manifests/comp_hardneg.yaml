@@ -1,4 +1,5 @@
 name: CompHardNeg
+schema_version: "1.0"
 version: "1.0"
 description: >
   Compositional hard-negative multiple choice, in the spirit of ConMe / ARO /

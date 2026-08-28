@@ -20,6 +20,26 @@ def test_leaderboard_html_contains_models_and_scores():
     assert "0.7000" in html
 
 
+def test_leaderboard_html_shows_confidence_interval_when_present():
+    results = [
+        {"model": "mock:v1", "benchmark": "DemoMC", "metrics": {"accuracy": 0.5},
+         "metric_ci95": {"accuracy": [0.3, 0.7]}, "cost": {"total_usd": 0.0}, "n_samples": 12},
+    ]
+    html = build_leaderboard_html(results)
+    assert "[0.3000, 0.7000]" in html
+
+
+def test_leaderboard_html_omits_ci_when_nan_or_absent():
+    results = [
+        {"model": "mock:v1", "benchmark": "DemoMC", "metrics": {"accuracy": 0.5},
+         "metric_ci95": {"accuracy": [float("nan"), float("nan")]},
+         "cost": {"total_usd": 0.0}, "n_samples": 12},
+    ]
+    html = build_leaderboard_html(results)
+    assert "nan" not in html
+    assert "0.5000" in html
+
+
 def test_save_html_report_writes_file(tmp_path):
     path = save_html_report(_RESULTS, path=tmp_path / "report.html", title="Test Report")
     assert path.exists()

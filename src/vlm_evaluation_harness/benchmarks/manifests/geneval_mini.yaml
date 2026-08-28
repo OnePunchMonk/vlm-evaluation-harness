@@ -1,4 +1,5 @@
 name: GenEvalMini
+schema_version: "1.0"
 version: "1.0"
 description: >
   Minimal compositional text-to-image benchmark, GenEval-style: each prompt

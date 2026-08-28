@@ -20,13 +20,19 @@ from vlm_evaluation_harness.adapters.generative.base import T2IAdapter
 from vlm_evaluation_harness.benchmarks.loader import BenchmarkLoader, BenchmarkSample
 from vlm_evaluation_harness.benchmarks.registry import get_registry
 from vlm_evaluation_harness.benchmarks.schema import BenchmarkManifest
+from vlm_evaluation_harness.engine.runner import (
+    RESULTS_SCHEMA_VERSION,
+    _harness_sha,
+    _harness_version,
+)
 from vlm_evaluation_harness.metrics.base import MetricResult
 from vlm_evaluation_harness.metrics.cost import GenCostTracker
 from vlm_evaluation_harness.metrics.generative import compute_generative_metrics
+from vlm_evaluation_harness.seeding import seed_everything
 from vlm_evaluation_harness.stats import bootstrap_ci
 
 _MAX_SAVED_IMAGES = 12
-HARNESS_VERSION = "0.2.0"
+HARNESS_VERSION = _harness_version()
 
 
 class GenEvalError(RuntimeError):
@@ -52,6 +58,12 @@ class GenEvalConfig:
     # distribution; FID and CLIPScore over a single draw are dominated by
     # seed variance.
     images_per_prompt: int = 1
+    # Whether the saved results JSON includes the full per-sample "samples"
+    # array. On by default, matching the harness's historical behavior.
+    log_samples: bool = True
+    # Generate images and cache them, but skip metric scoring (CLIPScore /
+    # judge / FID etc.) entirely.
+    predict_only: bool = False
 
 
 @dataclass
@@ -117,10 +129,16 @@ class GenEvalResult:
             },
         }
 
-    def save(self, output_dir: Path) -> Path:
+    def save(self, output_dir: Path, log_samples: bool = True) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         slug = f"{self.manifest.name.lower()}_{ts}"
+
+        full = self.to_dict()
+        if not log_samples:
+            result_file = output_dir / f"{slug}_results.json"
+            result_file.write_text(json.dumps(full, indent=2))
+            return result_file
 
         image_dir = output_dir / f"{slug}_images"
         image_paths: list[str | None] = [None] * len(self.sample_results)
@@ -132,7 +150,6 @@ class GenEvalResult:
             image.save(path)
             image_paths[i] = str(path)
 
-        full = self.to_dict()
         full["samples"] = [
             {
                 "id": s.sample_id,
@@ -159,6 +176,7 @@ class GenerativeEvalRunner:
         self._loader = BenchmarkLoader()
 
     def run(self, config: GenEvalConfig) -> GenEvalResult:
+        seed_everything(config.seed)
         registry = get_registry()
         manifest = registry.get(config.benchmark)
 
@@ -206,17 +224,20 @@ class GenerativeEvalRunner:
 
         finished_at = datetime.now(timezone.utc).isoformat()
 
-        prompts = [s.prompt for s in sample_results]
-        metadata = [s.metadata for s in sample_results]
-        sample_ids = [s.sample_id for s in sample_results]
-        metrics = compute_generative_metrics(
-            prompts, images, metadata, manifest.metrics, sample_ids
-        )
-        if all(m.n_scored == 0 for m in metrics):
-            raise GenEvalError(
-                f"No metric produced a score for '{manifest.name}' — check the manifest's "
-                "metrics configuration."
+        if config.predict_only:
+            metrics = []
+        else:
+            prompts = [s.prompt for s in sample_results]
+            metadata = [s.metadata for s in sample_results]
+            sample_ids = [s.sample_id for s in sample_results]
+            metrics = compute_generative_metrics(
+                prompts, images, metadata, manifest.metrics, sample_ids
             )
+            if all(m.n_scored == 0 for m in metrics):
+                raise GenEvalError(
+                    f"No metric produced a score for '{manifest.name}' — check the manifest's "
+                    "metrics configuration."
+                )
         cost_summary = cost_tracker.summary()
 
         result = GenEvalResult(
@@ -232,14 +253,16 @@ class GenerativeEvalRunner:
         )
 
         if config.output_dir:
-            saved_path = result.save(config.output_dir)
+            saved_path = result.save(config.output_dir, log_samples=config.log_samples)
             print(f"Results saved to {saved_path}")
 
         return result
 
     def _provenance(self, manifest, config: GenEvalConfig, registry) -> dict[str, Any]:
         return {
+            "results_schema_version": RESULTS_SCHEMA_VERSION,
             "harness_version": HARNESS_VERSION,
+            "harness_sha": _harness_sha(),
             "model_spec": config.model_spec,
             "adapter_model_id": self._adapter.model_id,
             "benchmark_version": manifest.version,

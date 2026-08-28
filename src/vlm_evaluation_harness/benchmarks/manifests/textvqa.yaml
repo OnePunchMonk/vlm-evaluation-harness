@@ -1,4 +1,5 @@
 name: TextVQA
+schema_version: "1.0"
 version: "1.0"
 description: >
   Text Visual QA. Questions requiring reading and understanding text

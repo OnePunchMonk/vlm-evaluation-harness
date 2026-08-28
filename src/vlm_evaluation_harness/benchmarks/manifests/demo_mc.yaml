@@ -1,4 +1,5 @@
 name: DemoMC
+schema_version: "1.0"
 version: "1.0"
 description: >
   Fully offline multiple-choice smoke-test benchmark: identify the color of

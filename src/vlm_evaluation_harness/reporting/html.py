@@ -33,7 +33,16 @@ th { background: #222; color: white; padding: 8px 12px; text-align: left; font-s
 td { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
 tr:hover { background: #f9f9f9; }
 .badge { padding: 2px 8px; border-radius: 4px; color: white; font-size: 12px; font-weight: 600; }
+.ci { color: #888; font-size: 12px; }
 """
+
+
+def _format_metric_cell(val: float | None, ci: list | None) -> str:
+    if val is None:
+        return "<td>—</td>"
+    if ci and len(ci) == 2 and all(c == c for c in ci):  # c == c filters NaN
+        return f"<td>{val:.4f} <span class='ci'>[{ci[0]:.4f}, {ci[1]:.4f}]</span></td>"
+    return f"<td>{val:.4f}</td>"
 
 
 def _leaderboard_rows(results: list[dict]) -> tuple[list[str], str]:
@@ -45,9 +54,10 @@ def _leaderboard_rows(results: list[dict]) -> tuple[list[str], str]:
     rows = ""
     for r in results:
         cells = [f"<td>{r.get('model', '')}</td>", f"<td>{r.get('benchmark', '')}</td>"]
+        ci95 = r.get("metric_ci95", {})
         for name in metric_cols:
             val = r.get("metrics", {}).get(name)
-            cells.append(f"<td>{val:.4f}</td>" if val is not None else "<td>—</td>")
+            cells.append(_format_metric_cell(val, ci95.get(name)))
         cost = r.get("cost", {}).get("total_usd", 0.0)
         cells.append(f"<td>${cost:.4f}</td>" if cost else "<td>—</td>")
         cells.append(f"<td>{r.get('n_samples', 0)}</td>")

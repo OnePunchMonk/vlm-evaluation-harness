@@ -1,4 +1,5 @@
 name: VQAv2
+schema_version: "1.0"
 version: "1.0"
 description: >
   Visual Question Answering v2. Open-ended questions about natural images,

@@ -1,4 +1,5 @@
 name: ScanQA
+schema_version: "1.0"
 version: "1.0"
 description: >
   3D scene question answering over ScanNet RGB-D scans.

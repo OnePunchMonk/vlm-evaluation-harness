@@ -1,4 +1,5 @@
 name: DocVQA
+schema_version: "1.0"
 version: "1.0"
 description: >
   Document Visual Question Answering. Questions about scanned documents,

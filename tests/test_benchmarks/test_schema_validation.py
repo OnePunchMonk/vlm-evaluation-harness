@@ -23,6 +23,16 @@ def test_valid_manifest_passes():
     _base_manifest().validate()  # should not raise
 
 
+def test_valid_manifest_defaults_schema_version_to_1_0():
+    assert _base_manifest().schema_version == "1.0"
+
+
+def test_unsupported_schema_version_raises():
+    manifest = _base_manifest(schema_version="99.0")
+    with pytest.raises(ManifestError, match="schema_version"):
+        manifest.validate()
+
+
 def test_unresolvable_template_placeholder_raises():
     manifest = _base_manifest(prompt_template="{question} {caption_0}")
     with pytest.raises(ManifestError, match="caption_0"):

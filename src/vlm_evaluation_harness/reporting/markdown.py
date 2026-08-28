@@ -14,6 +14,14 @@ _SEVERITY_EMOJI = {
 }
 
 
+def _format_metric_cell(val: float | None, ci: list | None) -> str:
+    if val is None:
+        return "—"
+    if ci and len(ci) == 2 and all(c == c for c in ci):  # c == c filters NaN
+        return f"{val:.4f} [{ci[0]:.4f}, {ci[1]:.4f}]"
+    return f"{val:.4f}"
+
+
 def build_leaderboard_markdown(results: list[dict]) -> str:
     metric_names: set[str] = set()
     for r in results:
@@ -27,9 +35,10 @@ def build_leaderboard_markdown(results: list[dict]) -> str:
     ]
     for r in results:
         row = [r.get("model", ""), r.get("benchmark", "")]
+        ci95 = r.get("metric_ci95", {})
         for name in metric_cols:
             val = r.get("metrics", {}).get(name)
-            row.append(f"{val:.4f}" if val is not None else "—")
+            row.append(_format_metric_cell(val, ci95.get(name)))
         cost = r.get("cost", {}).get("total_usd", 0.0)
         row.append(f"${cost:.4f}" if cost else "—")
         row.append(str(r.get("n_samples", 0)))

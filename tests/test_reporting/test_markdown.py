@@ -21,6 +21,15 @@ def test_leaderboard_markdown_is_a_table():
     assert "mock:v1" in md
 
 
+def test_leaderboard_markdown_shows_confidence_interval_when_present():
+    results = [
+        {"model": "mock:v1", "benchmark": "DemoMC", "metrics": {"accuracy": 0.5},
+         "metric_ci95": {"accuracy": [0.3, 0.7]}, "cost": {"total_usd": 0.0}, "n_samples": 12},
+    ]
+    md = build_leaderboard_markdown(results)
+    assert "0.5000 [0.3000, 0.7000]" in md
+
+
 def test_regression_markdown_empty_deltas():
     assert build_regression_markdown([]) == "No comparable runs found."
 

@@ -1,4 +1,5 @@
 name: POPE
+schema_version: "1.0"
 version: "1.0"
 description: >
   Polling-based Object Probing Evaluation. Binary yes/no questions
