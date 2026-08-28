@@ -395,6 +395,9 @@ class EvalRunner:
         for ex in examples:
             fields = dict(ex.text_fields)
             fields["answer"] = ex.references[0] if ex.references else ""
+            # Only consumed by few_shot.mode == "multi_turn" rendering;
+            # the concatenated (text-only) path ignores this key.
+            fields["images"] = ex.images
             rendered.append(fields)
         return rendered
 
@@ -574,6 +577,11 @@ class EvalRunner:
                 # meant to be independent samples, not the same cached call
                 # replayed N times.
                 params["self_consistency_index"] = i
+            if formatted.history:
+                # Multi-turn few-shot history changes what the model sees
+                # even when `formatted.text` (the final question) is
+                # identical, so it must be part of the cache key.
+                params["history"] = [(t.role, t.text) for t in formatted.history]
             key = response_key(
                 self._adapter.model_id, formatted.text, formatted.system, image_hashes, params
             )
@@ -585,6 +593,7 @@ class EvalRunner:
                     images=formatted.images,
                     prompt=formatted.text,
                     system=formatted.system,
+                    history=formatted.history or None,
                     max_tokens=config.max_tokens,
                     temperature=config.temperature,
                 )

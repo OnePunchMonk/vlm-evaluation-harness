@@ -9,6 +9,7 @@ from typing import Any
 
 from PIL import Image
 
+from vlm_evaluation_harness.adapters.base import ConversationTurn
 from vlm_evaluation_harness.benchmarks.schema import BenchmarkManifest
 
 
@@ -29,6 +30,10 @@ class FormattedPrompt:
     images: list[Image.Image | str]
     system: str | None = None
     raw_fields: dict[str, Any] = field(default_factory=dict)
+    # Populated only when few_shot.mode == "multi_turn": one user/assistant
+    # turn pair per few-shot example, meant to be passed as `history=` to
+    # VLMAdapter.generate() instead of being flattened into `text`.
+    history: list[ConversationTurn] = field(default_factory=list)
 
 
 _CHOICE_LETTERS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -52,8 +57,15 @@ class PromptFormatter:
             variables["choices"] = choices
             variables["formatted_choices"] = self.format_choices(choices)
 
+        multi_turn = few_shot_examples and manifest.few_shot.mode == "multi_turn"
         variables["few_shot_examples"] = (
-            self._render_few_shot(few_shot_examples, manifest) if few_shot_examples else ""
+            self._render_few_shot(few_shot_examples, manifest)
+            if few_shot_examples and not multi_turn
+            else ""
+        )
+
+        history = (
+            self._render_few_shot_turns(few_shot_examples, manifest) if multi_turn else []
         )
 
         return FormattedPrompt(
@@ -61,6 +73,7 @@ class PromptFormatter:
             images=sample_images,
             system=manifest.system_prompt,
             raw_fields=variables,
+            history=history,
         )
 
     def _render(self, template: str, variables: dict[str, Any]) -> str:
@@ -69,7 +82,15 @@ class PromptFormatter:
             for _, name, _, _ in string.Formatter().parse(template)
             if name
         }
-        missing = sorted(n for n in required if variables.get(n) in (None, ""))
+        # few_shot_examples is legitimately "" whenever few_shot.count == 0
+        # or mode == "multi_turn" — an empty value there is not a missing
+        # dataset field, unlike every other placeholder.
+        optional_when_empty = {"few_shot_examples"}
+        missing = sorted(
+            n
+            for n in required
+            if n not in optional_when_empty and variables.get(n) in (None, "")
+        )
         if missing:
             raise PromptFormatError(
                 f"prompt template placeholder(s) {missing} could not be filled from sample "
@@ -96,6 +117,30 @@ class PromptFormatter:
             letter = _CHOICE_LETTERS[i] if i < len(_CHOICE_LETTERS) else str(i)
             lines.append(f"{letter}. {choice}")
         return "\n".join(lines)
+
+    def _render_few_shot_turns(
+        self, examples: list[dict], manifest: BenchmarkManifest
+    ) -> list[ConversationTurn]:
+        """Render few-shot examples as alternating user/assistant turns.
+
+        Each example becomes a (user question [+ its images], assistant
+        answer) turn pair, for adapters whose chat template expects real
+        conversation turns rather than one flattened block of text — the
+        `mode: concatenated` behavior above.
+        """
+        turns: list[ConversationTurn] = []
+        for ex in examples:
+            variables = dict(ex)
+            choices = self.parse_choices(variables.get("choices"))
+            if choices is not None:
+                variables["choices"] = choices
+                variables["formatted_choices"] = self.format_choices(choices)
+            variables["few_shot_examples"] = ""
+            text = self._render(manifest.prompt_template, variables).strip()
+            images = ex.get("images", [])
+            turns.append(ConversationTurn(role="user", text=text, images=images))
+            turns.append(ConversationTurn(role="assistant", text=str(ex.get("answer", ""))))
+        return turns
 
     def _render_few_shot(self, examples: list[dict], manifest: BenchmarkManifest) -> str:
         parts = []

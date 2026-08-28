@@ -110,6 +110,11 @@ class FewShotConfig:
     source: str = "train"
     strategy: str = "fixed"  # "fixed" | "random"
     seed: int = 42
+    # "concatenated": examples flattened into the prompt text (default,
+    #   original behavior). "multi_turn": examples rendered as alternating
+    #   user/assistant ConversationTurns, for adapters whose chat template
+    #   expects real turns rather than a single long user message.
+    mode: str = "concatenated"
 
 
 @dataclass
@@ -313,6 +318,11 @@ class BenchmarkManifest:
             errors.append(
                 f"few_shot.source {self.few_shot.source!r} is not one of this benchmark's splits"
             )
+        if self.few_shot.mode not in {"concatenated", "multi_turn"}:
+            errors.append(
+                f"unknown few_shot.mode {self.few_shot.mode!r} "
+                "(known: 'concatenated', 'multi_turn')"
+            )
 
         if errors:
             raise ManifestError(
@@ -370,6 +380,7 @@ class BenchmarkManifest:
             source=fs_data.get("source", "train"),
             strategy=fs_data.get("strategy", "fixed"),
             seed=fs_data.get("seed", 42),
+            mode=fs_data.get("mode", "concatenated"),
         )
 
         metrics = [
