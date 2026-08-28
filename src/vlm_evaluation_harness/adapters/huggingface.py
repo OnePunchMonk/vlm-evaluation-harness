@@ -2,11 +2,39 @@
 
 from __future__ import annotations
 
+import logging
 import time
+from dataclasses import dataclass, field
 
 from PIL import Image
 
 from vlm_evaluation_harness.adapters.base import ChoiceScores, ConversationTurn, VLMResponse
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class BatchGenerateRequest:
+    """One sample's worth of `generate()` arguments, for `generate_batch`."""
+
+    images: list
+    prompt: str
+    system: str | None = None
+    history: list[ConversationTurn] | None = None
+    max_tokens: int = 1024
+    temperature: float = 0.0
+    metadata: dict = field(default_factory=dict)
+
+
+def _is_oom_error(exc: BaseException) -> bool:
+    try:
+        import torch
+
+        if isinstance(exc, torch.cuda.OutOfMemoryError):
+            return True
+    except ImportError:
+        pass
+    return isinstance(exc, RuntimeError) and "out of memory" in str(exc).lower()
 
 
 class HuggingFaceAdapter:
@@ -19,6 +47,7 @@ class HuggingFaceAdapter:
         torch_dtype: str = "auto",
         batch_size: int = 1,
         trust_remote_code: bool = True,
+        device_map: str | dict | None = None,
     ):
         try:
             import torch as _torch
@@ -37,12 +66,29 @@ class HuggingFaceAdapter:
         self._model_id = model_id
         self._batch_size = batch_size
 
+        # `device_map` (accelerate-backed sharding across multiple GPUs) takes
+        # priority over `device` when explicitly given; `device` alone still
+        # works exactly as before (it's passed straight through as
+        # `device_map=device`, which is what makes "auto" already spread a
+        # model across all visible GPUs when `accelerate` is installed).
+        resolved_device_map = device_map if device_map is not None else device
+        if resolved_device_map not in (None, "cpu") and not isinstance(
+            resolved_device_map, dict
+        ):
+            try:
+                import accelerate  # noqa: F401
+            except ImportError:
+                raise ImportError(
+                    "device_map requires the 'accelerate' package: "
+                    "pip install vlm-evaluation-harness[huggingface]"
+                )
+
         self._processor = AutoProcessor.from_pretrained(
             model_id, trust_remote_code=trust_remote_code
         )
         self._model = AutoModelForVision2Seq.from_pretrained(
             model_id,
-            device_map=device,
+            device_map=resolved_device_map,
             torch_dtype=dtype,
             trust_remote_code=trust_remote_code,
         )
@@ -117,6 +163,114 @@ class HuggingFaceAdapter:
             latency_ms=latency_ms,
             model_id=self._model_id,
         )
+
+    @property
+    def supports_batch_inference(self) -> bool:
+        """Whether `generate_batch` runs requests through one forward pass."""
+        return True
+
+    def generate_batch(self, requests: list[BatchGenerateRequest]) -> list[VLMResponse]:
+        """Generate responses for multiple samples in as few forward passes
+        as possible, backing off the batch size on out-of-memory errors.
+
+        Requests may mix prompts with and without images; all requests in a
+        given sub-batch are padded together by the processor. Order of the
+        returned list matches the order of `requests`.
+        """
+        if not requests:
+            return []
+        return self._generate_batch_with_backoff(requests, self._batch_size)
+
+    def _generate_batch_with_backoff(
+        self, requests: list[BatchGenerateRequest], batch_size: int
+    ) -> list[VLMResponse]:
+        results: list[VLMResponse] = []
+        for i in range(0, len(requests), max(1, batch_size)):
+            chunk = requests[i : i + max(1, batch_size)]
+            results.extend(self._run_chunk_with_backoff(chunk))
+        return results
+
+    def _run_chunk_with_backoff(
+        self, chunk: list[BatchGenerateRequest]
+    ) -> list[VLMResponse]:
+        size = len(chunk)
+        while True:
+            try:
+                return self._generate_forward(chunk)
+            except Exception as exc:  # noqa: BLE001 - re-raised below if not OOM
+                if not _is_oom_error(exc) or size <= 1:
+                    raise
+                try:
+                    import torch
+
+                    torch.cuda.empty_cache()
+                except ImportError:
+                    pass
+                new_size = max(1, size // 2)
+                logger.warning(
+                    "HuggingFaceAdapter: OOM at batch size %d, retrying at %d",
+                    size,
+                    new_size,
+                )
+                size = new_size
+                results: list[VLMResponse] = []
+                for j in range(0, len(chunk), size):
+                    results.extend(self._run_chunk_with_backoff(chunk[j : j + size]))
+                return results
+
+    def _generate_forward(self, chunk: list[BatchGenerateRequest]) -> list[VLMResponse]:
+        import torch
+
+        full_prompts = [
+            (f"{req.system}\n\n" if req.system else "") + req.prompt for req in chunk
+        ]
+        pil_images_per_request = [
+            [Image.open(img) if isinstance(img, str) else img for img in req.images]
+            for req in chunk
+        ]
+        # transformers image-text processors accept a list of per-sample
+        # image lists for batched multi-image inputs; a request with no
+        # images contributes an empty list.
+        has_any_images = any(pil_images_per_request)
+
+        inputs = self._processor(
+            text=full_prompts,
+            images=pil_images_per_request if has_any_images else None,
+            return_tensors="pt",
+            padding=True,
+        ).to(self._model.device)
+
+        max_tokens = max(req.max_tokens for req in chunk)
+        temperature = max(req.temperature for req in chunk)
+        gen_kwargs: dict = {"max_new_tokens": max_tokens}
+        if temperature > 0:
+            gen_kwargs["do_sample"] = True
+            gen_kwargs["temperature"] = temperature
+        else:
+            gen_kwargs["do_sample"] = False
+
+        t0 = time.perf_counter()
+        with torch.no_grad():
+            output_ids = self._model.generate(**inputs, **gen_kwargs)
+        latency_ms = (time.perf_counter() - t0) * 1000
+
+        input_len = inputs["input_ids"].shape[-1]
+        new_ids = output_ids[:, input_len:]
+        texts = self._processor.batch_decode(new_ids, skip_special_tokens=True)
+
+        responses = []
+        for req, text in zip(chunk, texts):
+            responses.append(
+                VLMResponse(
+                    text=text.strip(),
+                    input_tokens=input_len,
+                    output_tokens=new_ids.shape[-1],
+                    latency_ms=latency_ms / len(chunk),
+                    model_id=self._model_id,
+                    metadata=req.metadata,
+                )
+            )
+        return responses
 
     @property
     def supports_choice_scoring(self) -> bool:

@@ -13,10 +13,19 @@ _PROVIDERS: dict[str, str] = {
     "openai": "vlm_evaluation_harness.adapters.openai.OpenAIAdapter",
     "huggingface": "vlm_evaluation_harness.adapters.huggingface.HuggingFaceAdapter",
     "hf": "vlm_evaluation_harness.adapters.huggingface.HuggingFaceAdapter",
+    "openai_compatible": (
+        "vlm_evaluation_harness.adapters.openai_compatible.OpenAICompatibleAdapter"
+    ),
+    "vllm": "vlm_evaluation_harness.adapters.vllm.VLLMAdapter",
 }
 
 # Extras name to install for each provider, where it differs from the provider key.
-_EXTRAS: dict[str, str] = {"hf": "huggingface", "mock": ""}
+_EXTRAS: dict[str, str] = {
+    "hf": "huggingface",
+    "mock": "",
+    "openai_compatible": "openai",
+    "vllm": "openai",
+}
 
 
 def get_adapter(model_spec: str, **kwargs) -> VLMAdapter:
