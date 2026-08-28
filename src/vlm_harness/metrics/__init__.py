@@ -10,8 +10,13 @@ from vlm_harness.metrics.base import (
     compute_metrics,
     extraction_failure_rate,
 )
+from vlm_harness.metrics.calibration import CalibrationMetric
 from vlm_harness.metrics.cost import CostTracker
-from vlm_harness.metrics.hallucination import CHAIRMetric, POPEMetric
+from vlm_harness.metrics.hallucination import (
+    CHAIRMetric,
+    FineGrainedHallucinationMetric,
+    POPEMetric,
+)
 from vlm_harness.metrics.nlp import ANLSMetric, BLEUMetric, F1Metric, RougeMetric
 
 __all__ = [
@@ -25,6 +30,8 @@ __all__ = [
     "ANLSMetric",
     "CHAIRMetric",
     "POPEMetric",
+    "FineGrainedHallucinationMetric",
+    "CalibrationMetric",
     "CostTracker",
     "MetricResult",
     "ScoredSample",

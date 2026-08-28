@@ -35,6 +35,15 @@ def eval(
         "--cache/--no-cache",
         help="Cache model responses, keyed by (model, prompt, images, params)",
     ),
+    self_consistency: int = typer.Option(
+        1,
+        "--self-consistency",
+        help=(
+            "Sample the model N times at --temperature and majority-vote the "
+            "extracted answers (Wang et al. self-consistency). N=1 is today's "
+            "single-call behavior; use with --temperature > 0."
+        ),
+    ),
 ):
     """Evaluate a model on one or more benchmarks."""
     from vlm_harness.adapters.registry import get_adapter
@@ -62,6 +71,7 @@ def eval(
             ),
             corruption_severity=corruption_severity,
             use_cache=use_cache,
+            self_consistency_n=self_consistency,
         )
         result = runner.run(config)
         print_results(result)

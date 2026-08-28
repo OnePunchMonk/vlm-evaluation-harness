@@ -807,6 +807,34 @@ A well-calibrated model should:
 
 The harness measures both false refusals (unnecessary "I can't determine..." responses) and missed refusals (confident answers to genuinely unanswerable questions).
 
+### 11.4 Implemented subset (2026 update)
+
+Sections 10 and 11 above describe the full envisioned pipeline (claim
+extraction, an exhaustive 1,000-image probe dataset, bias/adversarial-prompt
+testing). What's actually shipped so far, in `metrics/hallucination.py` and
+`metrics/calibration.py`:
+
+- **Fine-grained hallucination** (`fine_grained_hallucination` metric, the
+  `hallu_fg` benchmark) — a decomposed version of §10's object/attribute/
+  spatial hallucination rates, using presence/absence probes tagged by
+  category rather than full claim extraction. Same spirit as 2026's
+  FIHA/FREAK-style benchmarks.
+- **Refusal calibration** (`calibration` metric, the `calib_deflect`
+  benchmark) — a first cut at §11.3: answerable vs. unanswerable questions,
+  scored on whether the model answers/deflects correctly, reporting
+  `overconfidence_rate` and `underconfidence_rate` separately. Same spirit as
+  VLM-DeflectionBench.
+- **Compositional hard negatives** (`accuracy` on the `comp_hardneg`
+  benchmark) — not previously in this doc at all. In the spirit of 2026's
+  ConMe/SCRAMBLe line of work: attribute/relation/object-swap hard negatives
+  against a correct caption, which plain accuracy on natural captions cannot
+  distinguish from bag-of-words matching.
+
+Not yet implemented: LLM-based claim extraction/verification, the curated
+1,000-image tiered probe dataset, bias measurement (§11.1), and adversarial
+visual prompts (§11.2) — all three fixture benchmarks above are small,
+hand-authored, and offline, standing in for what full datasets would cover.
+
 ---
 
 ## 12. Reproducibility

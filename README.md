@@ -71,6 +71,9 @@ adapter module behind them and were removed rather than fixed with a stub.)
 | `pope` | safety | yes_no | generate | `pope` metric — reports `yes_rate`, the diagnostic POPE misses if scored as plain accuracy |
 | `winoground` | cross_modal | pairwise_matching | generate | `pairwise_group`: both per-image prompts must be correct, per the original protocol |
 | `scanqa` | 3d_vision | open_ended | generate | |
+| `comp_hardneg` | reasoning | multiple_choice | generate | Offline fixture — ConMe/ARO-style hard negatives (attribute/relation/object swap); `accuracy_by_group` breaks out which swap type a model actually fails |
+| `hallu_fg` | safety | yes_no | generate | Offline fixture — `fine_grained_hallucination` decomposes hallucination rate by object/attribute/relation probe, not one POPE-style aggregate |
+| `calib_deflect` | safety | open_ended | generate | Offline fixture — `calibration` scores whether the model answers when it can and deflects when the image structurally can't answer, catching confident fabrication that accuracy alone rewards |
 
 **Generative** (text prompt → image, scored on the image):
 
@@ -80,6 +83,16 @@ adapter module behind them and were removed rather than fixed with a stub.)
 | `vqascore_mini` | `vqa_score` | VQAScore: P(yes) under a VLM asked "does this image show X" — correlates with human judgement better than CLIPScore on compositional prompts |
 | `geneval_mini` | `geneval_clip`, `clip_score` | Compositional (count/color/shape) prompts; needs `[generative]` |
 | `clipscore_mini` | `clip_score`, `llm_judge` | Open-ended prompts; needs `[generative]` |
+
+`comp_hardneg`, `hallu_fg`, and `calib_deflect` are 2026-research-inspired
+additions: hard-negative compositional reasoning (ConMe, arXiv:2406.08164;
+the axis SCRAMBLe and MultihopSpatial, arXiv:2603.18892, also target),
+fine-grained hallucination decomposition (in the spirit of FIHA/FREAK,
+arXiv:2603.19765), and refusal calibration (in the spirit of
+VLM-DeflectionBench). All three ship as small hand-authored offline fixtures
+so they run with zero network access or API keys, same as `demo_mc`/`pope`;
+swap in a full dataset by changing `source:` in the manifest once you have
+one to point at.
 
 Run `vlm-harness list-benchmarks --verbose` for the live list, or
 `vlm-harness validate-bench --bench <name>` to check a manifest.
@@ -128,6 +141,19 @@ A few decisions worth knowing about before you compare numbers across runs:
   text and regexing a letter out of it — this is what makes numbers
   comparable to published open-weight leaderboards. Currently implemented by
   the `huggingface`/`hf` and `mock` adapters via `score_choices()`.
+- **`--self-consistency N`** (with `--temperature > 0`) samples the model N
+  times per question and majority-votes the extracted answers instead of
+  trusting one generation (Wang et al. self-consistency). This is a real,
+  testable accuracy lever, not just more evaluation surface — see
+  `tests/test_engine/test_self_consistency.py`, which shows a synthetic noisy
+  adapter recover accuracy under majority-of-5 vs. single-shot on the same
+  fixture. `N=1` (default) is exactly today's single-call behavior. Each vote
+  gets a distinct cache key, so a resumed run doesn't replay the same cached
+  call N times:
+  ```bash
+  vlm-harness eval --model anthropic:claude-opus-4-6 --bench comp_hardneg \
+    --temperature 0.7 --self-consistency 5
+  ```
 
 ## Regression tracking
 

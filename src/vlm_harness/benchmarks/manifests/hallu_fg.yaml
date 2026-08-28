@@ -1,0 +1,50 @@
+name: FineGrainedHallucination
+version: "1.0"
+description: >
+  Fine-grained hallucination probing, in the spirit of 2026 FIHA/FREAK-style
+  benchmarks: binary presence/absence probes decomposed into object,
+  attribute, and relation categories, each scored separately, so a model
+  that hallucinates spatial relations but gets object existence right isn't
+  averaged into invisibility the way a single POPE-style number would.
+  Fully offline.
+taxonomy_category: safety
+modality: 2d
+
+source:
+  type: local
+  path: ../fixtures/hallu_fg
+
+splits:
+  - name: validation
+    scorable: true
+
+task_type: yes_no
+
+fields:
+  question: question
+  answer: answer
+  images:
+    - image
+  metadata_fields:
+    - hallu_category
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+  Answer with "Yes" or "No" only.
+
+answer_extraction:
+  strategy: yes_no
+  normalize: lowercase
+
+metrics:
+  - type: pope
+  - type: fine_grained_hallucination
+    field_name: hallu_category
+
+few_shot:
+  count: 0

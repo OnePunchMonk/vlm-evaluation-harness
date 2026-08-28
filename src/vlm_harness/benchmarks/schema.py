@@ -20,6 +20,8 @@ KNOWN_METRIC_TYPES = {
     "pope",
     "chair",
     "pairwise_group",
+    "fine_grained_hallucination",
+    "calibration",
 }
 
 # Metric types the generative dispatcher knows how to compute.
@@ -119,6 +121,10 @@ class MetricConfig:
     reference_dir: str | None = None
     # For `chair`: the metadata column holding ground-truth object labels.
     objects_field: str | None = None
+    # For `fine_grained_hallucination`: metadata column holding the probe
+    # category (object/attribute/relation). For `calibration`: metadata
+    # column holding whether the sample is answerable from the image.
+    field_name: str | None = None
 
 
 @dataclass
@@ -245,6 +251,9 @@ class BenchmarkManifest:
                 errors.append("metric 'accuracy_by_group' requires group_field")
             if metric.type == "chair" and not metric.objects_field:
                 errors.append("metric 'chair' requires objects_field")
+            field_name_required = {"fine_grained_hallucination", "calibration"}
+            if metric.type in field_name_required and not metric.field_name:
+                errors.append(f"metric {metric.type!r} requires field_name")
             if metric.type == "llm_judge" and not metric.judge_model:
                 errors.append("metric 'llm_judge' requires judge_model")
             if metric.type == "vqa_score" and not metric.judge_model:
@@ -255,6 +264,11 @@ class BenchmarkManifest:
                 errors.append(
                     f"metric group_field {metric.group_field!r} is not produced by the loader — "
                     "declare it via fields.subject, fields.difficulty, or fields.metadata_fields"
+                )
+            if metric.field_name and metric.field_name not in self._metadata_keys():
+                errors.append(
+                    f"metric field_name {metric.field_name!r} is not produced by the loader — "
+                    "declare it via fields.metadata_fields"
                 )
 
         if self.answer_extraction.strategy == "regex" and not self.answer_extraction.regex_pattern:
@@ -339,6 +353,7 @@ class BenchmarkManifest:
                 checks_field=m.get("checks_field"),
                 reference_dir=m.get("reference_dir"),
                 objects_field=m.get("objects_field"),
+                field_name=m.get("field_name"),
             )
             for m in data.get("metrics", [{"type": "accuracy"}])
         ]
