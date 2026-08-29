@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 
-from vlm_evaluation_harness.adapters.openai import OpenAIAdapter
+from vlm_evaluation_harness.adapters.openai import AsyncOpenAIAdapter, OpenAIAdapter
 
 
 class OpenAICompatibleAdapter(OpenAIAdapter):
@@ -43,6 +43,43 @@ class OpenAICompatibleAdapter(OpenAIAdapter):
             raise ImportError("pip install vlm-evaluation-harness[openai]")
 
         self._client = _openai.OpenAI(
+            api_key=api_key or os.environ.get("OPENAI_API_KEY", "EMPTY"),
+            base_url=resolved_base_url,
+        )
+        self._model_id = model_id
+
+    @property
+    def cost_per_million_input_tokens(self) -> float | None:
+        return None
+
+    @property
+    def cost_per_million_output_tokens(self) -> float | None:
+        return None
+
+
+class AsyncOpenAICompatibleAdapter(AsyncOpenAIAdapter):
+    """Async variant of `OpenAICompatibleAdapter` (see its docstring)."""
+
+    def __init__(
+        self,
+        model_id: str,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ):
+        resolved_base_url = base_url or os.environ.get("VLM_HARNESS_BASE_URL")
+        if not resolved_base_url:
+            raise ValueError(
+                "AsyncOpenAICompatibleAdapter needs a base URL: pass base_url=... or "
+                "set the VLM_HARNESS_BASE_URL environment variable "
+                "(e.g. http://localhost:8000/v1)."
+            )
+
+        try:
+            import openai as _openai
+        except ImportError:
+            raise ImportError("pip install vlm-evaluation-harness[openai]")
+
+        self._client = _openai.AsyncOpenAI(
             api_key=api_key or os.environ.get("OPENAI_API_KEY", "EMPTY"),
             base_url=resolved_base_url,
         )
