@@ -1,0 +1,10 @@
+{"id": "refcoco_mini_00", "question": "Locate the red circle in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "8.0,8.0,56.0,56.0", "image": "images/scene_00.png"}
+{"id": "refcoco_mini_01", "question": "Locate the blue square in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "72.0,8.0,120.0,56.0", "image": "images/scene_00.png"}
+{"id": "refcoco_mini_02", "question": "Locate the green square in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "8.0,8.0,56.0,56.0", "image": "images/scene_01.png"}
+{"id": "refcoco_mini_03", "question": "Locate the yellow circle in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "72.0,8.0,120.0,56.0", "image": "images/scene_01.png"}
+{"id": "refcoco_mini_04", "question": "Locate the red circle in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "8.0,8.0,56.0,56.0", "image": "images/scene_02.png"}
+{"id": "refcoco_mini_05", "question": "Locate the yellow square in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "72.0,8.0,120.0,56.0", "image": "images/scene_02.png"}
+{"id": "refcoco_mini_06", "question": "Locate the blue circle in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "136.0,8.0,184.0,56.0", "image": "images/scene_02.png"}
+{"id": "refcoco_mini_07", "question": "Locate the blue square in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "8.0,8.0,56.0,56.0", "image": "images/scene_03.png"}
+{"id": "refcoco_mini_08", "question": "Locate the green circle in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "72.0,8.0,120.0,56.0", "image": "images/scene_03.png"}
+{"id": "refcoco_mini_09", "question": "Locate the red square in this image. Reply with its bounding box as [x1, y1, x2, y2].", "answer": "136.0,8.0,184.0,56.0", "image": "images/scene_03.png"}

@@ -33,6 +33,8 @@ class AnswerExtractor:
             extracted, confident = self._yes_no(text)
         elif strategy == "json":
             extracted, confident = self._json_field(text)
+        elif strategy == "bbox":
+            extracted, confident = self._bbox(text)
         elif strategy == "exact":
             extracted, confident = text.strip(), True
         else:
@@ -88,6 +90,27 @@ class AnswerExtractor:
         for no_word in ["no", "false", "incorrect", "wrong"]:
             if re.search(rf"\b{no_word}\b", lower):
                 return "no", True
+        return text.strip(), False
+
+    def _bbox(self, text: str) -> tuple[str, bool]:
+        """Extract a 4-coordinate bounding box, normalized to "x1,y1,x2,y2".
+
+        Accepts the box conventions models actually produce: a bracketed
+        list (`[10, 20, 90, 80]`), a pair of coordinate tuples
+        (`(10,20),(90,80)`), or four bare numbers ("10, 20, 90, 80"). Returns
+        the original text with `confident=False` rather than a wrong box
+        when nothing parses — never guess coordinates.
+        """
+        num = r"[-+]?\d+(?:\.\d+)?"
+        patterns = [
+            rf"\[\s*({num})\s*,\s*({num})\s*,\s*({num})\s*,\s*({num})\s*\]",
+            rf"\(\s*({num})\s*,\s*({num})\s*\)\s*,?\s*\(\s*({num})\s*,\s*({num})\s*\)",
+            rf"({num})\s*,\s*({num})\s*,\s*({num})\s*,\s*({num})",
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, text)
+            if m:
+                return ",".join(str(float(g)) for g in m.groups()), True
         return text.strip(), False
 
     def _json_field(self, text: str) -> tuple[str, bool]:

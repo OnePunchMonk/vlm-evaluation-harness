@@ -238,8 +238,94 @@ def gen_calib_deflect() -> None:
             f.write(json.dumps(row) + "\n")
 
 
+def gen_refcoco_mini() -> None:
+    """Offline stand-in for RefCOCO-style referring-expression grounding.
+
+    NOT the real RefCOCO dataset — synthetic scenes of 2-3 shapes at known,
+    programmatically-drawn positions (same `make_object_image` box math as
+    hallu_fg), with a referring expression naming one shape by color+shape
+    (kept unique per scene so the expression is unambiguous) and its
+    ground-truth box as the ("x1,y1,x2,y2") ready to compare against a
+    `bbox`-extracted prediction via metrics/grounding.py.
+    """
+    out = FIXTURES / "refcoco_mini"
+    rows = []
+    scenes = [
+        [("circle", "red"), ("square", "blue")],
+        [("square", "green"), ("circle", "yellow")],
+        [("circle", "red"), ("square", "yellow"), ("circle", "blue")],
+        [("square", "blue"), ("circle", "green"), ("square", "red")],
+    ]
+    idx = 0
+    for scene_i, scene in enumerate(scenes):
+        img_name = f"images/scene_{scene_i:02d}.png"
+        make_object_image(out / img_name, scene)
+        for i, (shape, color) in enumerate(scene):
+            box = (i * 64 + 8, 8, i * 64 + 56, 56)
+            rows.append(
+                {
+                    "id": f"refcoco_mini_{idx:02d}",
+                    "question": f"Locate the {color} {shape} in this image. "
+                    "Reply with its bounding box as [x1, y1, x2, y2].",
+                    "answer": ",".join(str(float(c)) for c in box),
+                    "image": img_name,
+                }
+            )
+            idx += 1
+
+    with open(out / "validation.jsonl", "w") as f:
+        for row in rows:
+            f.write(json.dumps(row) + "\n")
+
+
+def gen_spatial_count() -> None:
+    """Offline counting/spatial-reasoning fixture: "how many X are there?"
+
+    A currently-thin vision benchmark area (existing fixtures are mostly
+    single-object identification/hallucination probes) — this one requires
+    actually counting instances of a shape across a scene of several
+    objects, open-ended numeric answer scored by `metrics/accuracy.py`'s
+    `number`-extraction path.
+    """
+    out = FIXTURES / "spatial_count"
+    rows = []
+    scenes = [
+        [("circle", "red"), ("circle", "red"), ("square", "blue")],
+        [("square", "green"), ("square", "green"), ("square", "green"), ("circle", "yellow")],
+        [("circle", "blue")],
+        [
+            ("circle", "red"),
+            ("square", "red"),
+            ("circle", "blue"),
+            ("square", "blue"),
+            ("circle", "yellow"),
+        ],
+    ]
+    idx = 0
+    for scene_i, scene in enumerate(scenes):
+        img_name = f"images/scene_{scene_i:02d}.png"
+        make_object_image(out / img_name, scene)
+        for shape in SHAPES:
+            count = sum(1 for s, _ in scene if s == shape)
+            rows.append(
+                {
+                    "id": f"spatial_count_{idx:02d}",
+                    "question": f"How many {shape}s are in this image? Reply with a number only.",
+                    "answer": str(count),
+                    "image": img_name,
+                }
+            )
+            idx += 1
+
+    with open(out / "validation.jsonl", "w") as f:
+        for row in rows:
+            f.write(json.dumps(row) + "\n")
+
+
 if __name__ == "__main__":
     gen_comp_hardneg()
     gen_hallu_fg()
     gen_calib_deflect()
+    gen_refcoco_mini()
+    gen_spatial_count()
     print("done")

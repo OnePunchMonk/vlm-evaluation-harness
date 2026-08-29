@@ -101,3 +101,42 @@ def test_invalid_regex_pattern_raises():
     )
     with pytest.raises(ManifestError, match="regex_pattern"):
         manifest.validate()
+
+
+def test_grounding_task_type_requires_bbox_strategy():
+    manifest = _base_manifest(
+        task_type="grounding",
+        metrics=[{"type": "iou"}],
+    )
+    with pytest.raises(ManifestError, match="bbox"):
+        manifest.validate()
+
+
+def test_grounding_task_type_with_bbox_strategy_is_valid():
+    manifest = _base_manifest(
+        task_type="grounding",
+        answer_extraction={"strategy": "bbox", "normalize": "none"},
+        metrics=[{"type": "iou"}, {"type": "acc_at_50"}],
+    )
+    manifest.validate()  # should not raise
+
+
+def test_unknown_image_placement_raises():
+    manifest = _base_manifest(image_config={"placement": "sideways"})
+    with pytest.raises(ManifestError, match="placement"):
+        manifest.validate()
+
+
+def test_interleaved_placement_is_valid():
+    manifest = _base_manifest(image_config={"placement": "interleaved"})
+    manifest.validate()  # should not raise
+
+
+def test_negative_max_tokens_per_image_raises():
+    manifest = _base_manifest(image_config={"max_tokens_per_image": -1})
+    with pytest.raises(ManifestError, match="max_tokens_per_image"):
+        manifest.validate()
+
+
+def test_max_tokens_per_image_none_is_valid():
+    assert _base_manifest().image_config.max_tokens_per_image is None

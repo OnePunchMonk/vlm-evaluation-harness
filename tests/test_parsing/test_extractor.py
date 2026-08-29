@@ -60,6 +60,36 @@ class TestYesNoExtraction:
         assert r.normalized == "yes"
 
 
+class TestBboxExtraction:
+    def test_bracketed_list(self):
+        r = extractor.extract("The object is at [10, 20, 90, 80].", cfg("bbox", "none"))
+        assert r.normalized == "10.0,20.0,90.0,80.0"
+        assert r.confident
+
+    def test_coordinate_pairs(self):
+        r = extractor.extract("Located at (10, 20), (90, 80)", cfg("bbox", "none"))
+        assert r.normalized == "10.0,20.0,90.0,80.0"
+        assert r.confident
+
+    def test_bare_numbers(self):
+        r = extractor.extract("bbox: 10, 20, 90, 80", cfg("bbox", "none"))
+        assert r.normalized == "10.0,20.0,90.0,80.0"
+        assert r.confident
+
+    def test_floats(self):
+        r = extractor.extract("[10.5, 20.25, 90.0, 80.75]", cfg("bbox", "none"))
+        assert r.normalized == "10.5,20.25,90.0,80.75"
+
+    def test_negative_coordinates(self):
+        r = extractor.extract("[-5, 10, 90, 80]", cfg("bbox", "none"))
+        assert r.normalized == "-5.0,10.0,90.0,80.0"
+
+    def test_unparseable_returns_unconfident(self):
+        r = extractor.extract("I cannot locate that object.", cfg("bbox", "none"))
+        assert not r.confident
+        assert r.normalized == "I cannot locate that object."
+
+
 class TestNormalization:
     def test_vqa_removes_articles(self):
         assert normalize_answer("a cat", "vqa") == "cat"

@@ -136,6 +136,7 @@ def compute_metrics(samples: list[ScoredSample], metric_configs: list) -> list[M
         VQAAccuracyMetric,
     )
     from vlm_evaluation_harness.metrics.calibration import CalibrationMetric
+    from vlm_evaluation_harness.metrics.grounding import AccAt50Metric, IoUMetric
     from vlm_evaluation_harness.metrics.hallucination import (
         CHAIRMetric,
         FineGrainedHallucinationMetric,
@@ -183,6 +184,10 @@ def compute_metrics(samples: list[ScoredSample], metric_configs: list) -> list[M
             results.append(
                 CalibrationMetric(cfg.field_name or "answerable").compute(samples)
             )
+        elif cfg.type == "iou":
+            results.append(IoUMetric().compute(samples))
+        elif cfg.type == "acc_at_50":
+            results.append(AccAt50Metric().compute(samples))
         else:
             raise ValueError(f"Unknown metric type: {cfg.type!r}")
 

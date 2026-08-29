@@ -1,0 +1,47 @@
+name: RefCOCOMini
+schema_version: "1.0"
+version: "1.0"
+description: >
+  Offline stand-in for RefCOCO-style referring-expression grounding — NOT the
+  real RefCOCO dataset. Synthetic scenes of 2-3 shapes at known,
+  programmatically-drawn positions with a referring expression naming one
+  shape by color+shape, scored by IoU/Acc@0.5 against the ground-truth box.
+  Fully offline; swap in real RefCOCO/RefCOCO+/RefCOCOg by changing
+  `source:` once you have it.
+taxonomy_category: perception
+tags: [grounding]
+modality: 2d
+
+source:
+  type: local
+  path: ../fixtures/refcoco_mini
+
+splits:
+  - name: validation
+    scorable: true
+
+task_type: grounding
+
+fields:
+  question: question
+  answer: answer
+  images:
+    - image
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+answer_extraction:
+  strategy: bbox
+  normalize: none
+
+metrics:
+  - type: iou
+  - type: acc_at_50
+
+few_shot:
+  count: 0

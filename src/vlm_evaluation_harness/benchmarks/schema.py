@@ -22,6 +22,10 @@ KNOWN_METRIC_TYPES = {
     "pairwise_group",
     "fine_grained_hallucination",
     "calibration",
+    # Grounding: mean IoU / fraction of samples with IoU >= 0.5, over
+    # "x1,y1,x2,y2" bounding-box predictions. See metrics/grounding.py.
+    "iou",
+    "acc_at_50",
 }
 
 # Metric types the generative dispatcher knows how to compute.
@@ -40,6 +44,9 @@ KNOWN_TASK_TYPES = {
     "captioning",
     "pairwise_matching",
     "text_to_image",
+    # Model answers with a bounding box locating a described region, scored
+    # by IoU against a ground-truth box rather than string/letter matching.
+    "grounding",
 }
 
 KNOWN_SCORING_MODES = {"generate", "loglikelihood"}
@@ -89,13 +96,32 @@ class FieldsConfig:
 @dataclass
 class ImageConfig:
     max_images: int = 1
-    placement: str = "before_text"  # "before_text" | "after_text"
+    # "before_text"/"after_text": all images placed as one block relative to
+    # the rendered prompt text (today's behavior). "interleaved": the prompt
+    # template itself contains per-image placeholders (`{image_1}`,
+    # `{image_2}`, ...) marking where each image slots in among the text, for
+    # multi-image benchmarks that need to say "compare {image_1} to
+    # {image_2}" rather than "here are N images, then some text". Schema-side
+    # support only as of this field's introduction — prompt/formatter.py
+    # still needs to actually resolve `{image_N}` placeholders into image
+    # insertion points; until then this value validates but renders no
+    # differently from "before_text".
+    placement: str = "before_text"  # "before_text" | "after_text" | "interleaved"
     missing_strategy: str = "skip"  # "skip" | "error"
+    # Approximate vision-token budget per image, for probing how accuracy
+    # degrades as available image detail shrinks (e.g. re-running the same
+    # benchmark at a few budgets and comparing). None = no budget, use the
+    # adapter's native resolution. Schema-side declaration only: an adapter
+    # or images/pipeline.py must actually resize/tile images to hit this
+    # budget for it to have any effect — not wired up yet.
+    max_tokens_per_image: int | None = None
 
 
 @dataclass
 class AnswerExtractionConfig:
-    strategy: str = "exact"  # "first_letter" | "regex" | "exact" | "number" | "yes_no" | "json"
+    # "bbox" parses a "[x1, y1, x2, y2]"-or-similar bounding box out of free
+    # text (see parsing/extractor.py); required for task_type "grounding".
+    strategy: str = "exact"  # "first_letter"|"regex"|"exact"|"number"|"yes_no"|"json"|"bbox"
     normalize: str = "strip"  # "strip" | "uppercase" | "lowercase" | "vqa" | "none"
     regex_pattern: str | None = None
     # Ordered post-normalization filters (see parsing/filters.py), applied
@@ -154,7 +180,13 @@ class BenchmarkManifest:
     version: str = "1.0"
     description: str = ""
     task_type: str = "open_ended"
-    modality: str = "2d"  # "2d" | "3d" | "text_only"
+    # "video" is accepted here (unchecked, like the others) as a taxonomy
+    # label, but a real frame-sequence-per-sample protocol isn't implemented:
+    # loader.py's `_extract_images` reads one image per named field, not a
+    # list of frames per field, and no adapter declares video support beyond
+    # the existing `supports_video` capability flag. Needs loader.py +
+    # adapter work to actually run.
+    modality: str = "2d"  # "2d" | "3d" | "text_only" | "video"
     taxonomy_category: str = "perception"
     # Free-form labels for cross-cutting grouping (e.g. "safety",
     # "compositional") that don't fit the single taxonomy_category axis.
@@ -305,6 +337,19 @@ class BenchmarkManifest:
                     "declare it via fields.metadata_fields"
                 )
 
+        if self.task_type == "grounding" and self.answer_extraction.strategy != "bbox":
+            errors.append("task_type 'grounding' requires answer_extraction.strategy 'bbox'")
+        if self.image_config.placement not in {"before_text", "after_text", "interleaved"}:
+            errors.append(
+                f"unknown image_config.placement {self.image_config.placement!r} "
+                "(known: 'before_text', 'after_text', 'interleaved')"
+            )
+        if (
+            self.image_config.max_tokens_per_image is not None
+            and self.image_config.max_tokens_per_image <= 0
+        ):
+            errors.append("image_config.max_tokens_per_image must be a positive int if set")
+
         if self.answer_extraction.strategy == "regex" and not self.answer_extraction.regex_pattern:
             errors.append("answer_extraction strategy 'regex' requires regex_pattern")
         if self.answer_extraction.regex_pattern:
@@ -372,6 +417,7 @@ class BenchmarkManifest:
             max_images=img_data.get("max_images", 1),
             placement=img_data.get("placement", "before_text"),
             missing_strategy=img_data.get("missing_strategy", "skip"),
+            max_tokens_per_image=img_data.get("max_tokens_per_image"),
         )
 
         ae_data = data.get("answer_extraction", {})

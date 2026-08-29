@@ -1,0 +1,8 @@
+{"id": "spatial_count_00", "question": "How many circles are in this image? Reply with a number only.", "answer": "2", "image": "images/scene_00.png"}
+{"id": "spatial_count_01", "question": "How many squares are in this image? Reply with a number only.", "answer": "1", "image": "images/scene_00.png"}
+{"id": "spatial_count_02", "question": "How many circles are in this image? Reply with a number only.", "answer": "1", "image": "images/scene_01.png"}
+{"id": "spatial_count_03", "question": "How many squares are in this image? Reply with a number only.", "answer": "3", "image": "images/scene_01.png"}
+{"id": "spatial_count_04", "question": "How many circles are in this image? Reply with a number only.", "answer": "1", "image": "images/scene_02.png"}
+{"id": "spatial_count_05", "question": "How many squares are in this image? Reply with a number only.", "answer": "0", "image": "images/scene_02.png"}
+{"id": "spatial_count_06", "question": "How many circles are in this image? Reply with a number only.", "answer": "3", "image": "images/scene_03.png"}
+{"id": "spatial_count_07", "question": "How many squares are in this image? Reply with a number only.", "answer": "2", "image": "images/scene_03.png"}

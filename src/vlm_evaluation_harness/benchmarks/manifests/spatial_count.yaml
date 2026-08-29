@@ -1,0 +1,44 @@
+name: SpatialCount
+schema_version: "1.0"
+version: "1.0"
+description: >
+  Offline counting/spatial-reasoning fixture: "how many {shape}s are in this
+  image?" over synthetic multi-object scenes. Fills a currently-thin area —
+  existing offline fixtures are mostly single-object identification or
+  hallucination probes, not counting. Fully offline.
+taxonomy_category: reasoning
+tags: [counting, spatial]
+modality: 2d
+
+source:
+  type: local
+  path: ../fixtures/spatial_count
+
+splits:
+  - name: validation
+    scorable: true
+
+task_type: open_ended
+
+fields:
+  question: question
+  answer: answer
+  images:
+    - image
+
+image_config:
+  max_images: 1
+  placement: before_text
+
+prompt_template: |
+  {question}
+
+answer_extraction:
+  strategy: number
+  normalize: strip
+
+metrics:
+  - type: accuracy
+
+few_shot:
+  count: 0
