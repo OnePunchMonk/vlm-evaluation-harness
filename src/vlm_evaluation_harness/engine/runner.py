@@ -6,6 +6,7 @@ import importlib.metadata
 import json
 import math
 import platform
+import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -190,8 +191,9 @@ class EvalResult:
 
     def save(self, output_dir: Path, log_samples: bool = True) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        slug = f"{self.manifest.name.lower()}_{ts}"
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        model_slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", self.config.model_spec).strip("-")
+        slug = f"{self.manifest.name.lower()}_{model_slug}_{ts}"
         result_file = output_dir / f"{slug}_results.json"
 
         full = self.to_dict()

@@ -9,6 +9,7 @@ text, and scoring happens over images rather than extracted answer strings.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -131,8 +132,9 @@ class GenEvalResult:
 
     def save(self, output_dir: Path, log_samples: bool = True) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        slug = f"{self.manifest.name.lower()}_{ts}"
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        model_slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", self.config.model_spec).strip("-")
+        slug = f"{self.manifest.name.lower()}_{model_slug}_{ts}"
 
         full = self.to_dict()
         if not log_samples:
