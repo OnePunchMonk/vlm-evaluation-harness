@@ -117,6 +117,59 @@ class HuggingFaceAdapter:
     def cost_per_million_output_tokens(self) -> float | None:
         return None
 
+    def _render_prompt(
+        self,
+        images: list,
+        prompt: str,
+        system: str | None,
+        history: list[ConversationTurn] | None,
+    ) -> tuple[str, list]:
+        """Render (system, history, prompt) into model input text.
+
+        Uses the processor's/tokenizer's own `apply_chat_template` when the
+        checkpoint ships one (true for most instruction-tuned VLMs) so the
+        text matches what the model was actually fine-tuned on, instead of a
+        hand-rolled format that silently produces worse-than-real numbers.
+        Falls back to a plain concatenation when no chat template is
+        available. Either way, `history` (e.g. multi-turn few-shot examples)
+        is now actually included — previously it was accepted as a parameter
+        here and silently dropped.
+        """
+        apply_chat_template = getattr(self._processor, "apply_chat_template", None)
+        tokenizer = getattr(self._processor, "tokenizer", None)
+        chat_template = getattr(self._processor, "chat_template", None) or getattr(
+            tokenizer, "chat_template", None
+        )
+        if apply_chat_template is None and tokenizer is not None:
+            apply_chat_template = getattr(tokenizer, "apply_chat_template", None)
+
+        all_images: list = []
+        if chat_template and apply_chat_template is not None:
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": [{"type": "text", "text": system}]})
+            for turn in history or []:
+                content = [{"type": "image"} for _ in turn.images]
+                content.append({"type": "text", "text": turn.text})
+                messages.append({"role": turn.role, "content": content})
+                all_images.extend(turn.images)
+            content = [{"type": "image"} for _ in images]
+            content.append({"type": "text", "text": prompt})
+            messages.append({"role": "user", "content": content})
+            all_images.extend(images)
+            text = apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            return text, all_images
+
+        parts = []
+        if system:
+            parts.append(system)
+        for turn in history or []:
+            parts.append(f"{turn.role}: {turn.text}")
+            all_images.extend(turn.images)
+        parts.append(prompt)
+        all_images.extend(images)
+        return "\n\n".join(parts), all_images
+
     def generate(
         self,
         images: list[Image.Image | str],
@@ -128,11 +181,10 @@ class HuggingFaceAdapter:
     ) -> VLMResponse:
         import torch
 
+        full_prompt, all_images = self._render_prompt(images, prompt, system, history)
         pil_images = [
-            Image.open(img) if isinstance(img, str) else img for img in images
+            Image.open(img) if isinstance(img, str) else img for img in all_images
         ]
-
-        full_prompt = (f"{system}\n\n" if system else "") + prompt
 
         inputs = self._processor(
             text=full_prompt,
@@ -221,12 +273,14 @@ class HuggingFaceAdapter:
     def _generate_forward(self, chunk: list[BatchGenerateRequest]) -> list[VLMResponse]:
         import torch
 
-        full_prompts = [
-            (f"{req.system}\n\n" if req.system else "") + req.prompt for req in chunk
-        ]
-        pil_images_per_request = [
-            [Image.open(img) if isinstance(img, str) else img for img in req.images]
+        rendered = [
+            self._render_prompt(req.images, req.prompt, req.system, req.history)
             for req in chunk
+        ]
+        full_prompts = [text for text, _ in rendered]
+        pil_images_per_request = [
+            [Image.open(img) if isinstance(img, str) else img for img in all_imgs]
+            for _, all_imgs in rendered
         ]
         # transformers image-text processors accept a list of per-sample
         # image lists for batched multi-image inputs; a request with no
