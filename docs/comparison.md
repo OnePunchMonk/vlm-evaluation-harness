@@ -15,10 +15,13 @@ gaps encountered while using them:
   regression` diffs two tracked runs with a paired McNemar test over
   per-sample scores plus a bootstrap confidence interval, not a fixed
   percentage threshold on the aggregate delta. A 4-point swing on 50 samples
-  is flagged only if it's unlikely to be noise. Neither lmms-eval nor
-  VLMEvalKit ships a first-class "is this a real regression" comparison
-  between two runs — that's typically left to whatever spreadsheet or
-  dashboard sits downstream of their result JSON/CSV output.
+  is flagged only if it's unlikely to be noise. As far as we're aware,
+  neither lmms-eval nor VLMEvalKit ships this kind of paired-significance
+  run-to-run comparison out of the box (we haven't audited either codebase
+  exhaustively, so treat this as our understanding rather than a verified
+  claim about their internals) — in our own prior usage this was typically
+  left to whatever spreadsheet or dashboard sits downstream of their result
+  JSON/CSV output.
 - **Manifests fail loudly, not silently.** Every built-in benchmark manifest
   is structurally validated at registry load time — an unresolvable prompt
   template placeholder, a scorable split with no reference field, or an
