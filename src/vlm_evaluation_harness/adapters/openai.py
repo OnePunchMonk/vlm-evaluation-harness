@@ -10,13 +10,8 @@ from pathlib import Path
 from PIL import Image
 
 from vlm_evaluation_harness.adapters.base import ConversationTurn, VLMResponse
+from vlm_evaluation_harness.pricing import get_pricing
 from vlm_evaluation_harness.retry import with_retries
-
-_PRICING: dict[str, tuple[float, float]] = {
-    "gpt-4o": (5.0, 15.0),
-    "gpt-4o-mini": (0.15, 0.60),
-    "gpt-4-turbo": (10.0, 30.0),
-}
 
 
 def _encode_image(image: Image.Image | str) -> dict:
@@ -58,8 +53,6 @@ def _build_messages(
 class OpenAIAdapter:
     """Adapter for GPT-4o and other OpenAI vision models."""
 
-    _PRICING = _PRICING
-
     def __init__(self, model_id: str = "gpt-4o", api_key: str | None = None):
         try:
             import openai as _openai
@@ -87,11 +80,11 @@ class OpenAIAdapter:
 
     @property
     def cost_per_million_input_tokens(self) -> float | None:
-        return self._PRICING.get(self._model_id, (0.0, 0.0))[0]
+        return get_pricing("openai", self._model_id)[0]
 
     @property
     def cost_per_million_output_tokens(self) -> float | None:
-        return self._PRICING.get(self._model_id, (0.0, 0.0))[1]
+        return get_pricing("openai", self._model_id)[1]
 
     def generate(
         self,
@@ -133,8 +126,6 @@ class AsyncOpenAIAdapter:
     call this.
     """
 
-    _PRICING = _PRICING
-
     def __init__(self, model_id: str = "gpt-4o", api_key: str | None = None):
         try:
             import openai as _openai
@@ -162,11 +153,11 @@ class AsyncOpenAIAdapter:
 
     @property
     def cost_per_million_input_tokens(self) -> float | None:
-        return self._PRICING.get(self._model_id, (0.0, 0.0))[0]
+        return get_pricing("openai", self._model_id)[0]
 
     @property
     def cost_per_million_output_tokens(self) -> float | None:
-        return self._PRICING.get(self._model_id, (0.0, 0.0))[1]
+        return get_pricing("openai", self._model_id)[1]
 
     async def agenerate(
         self,

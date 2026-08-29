@@ -1,0 +1,15 @@
+# Model pricing in USD per 1M tokens: [input, output].
+# Loaded by pricing.py — see that module for how to override/extend this
+# without touching adapter code (VLM_HARNESS_PRICING_FILE env var).
+# Pricing as of 2026-04.
+
+anthropic:
+  claude-opus-4-6: [15.0, 75.0]
+  claude-sonnet-4-6: [3.0, 15.0]
+  claude-haiku-4-5: [0.80, 4.0]
+  claude-haiku-4-5-20251001: [0.80, 4.0]
+
+openai:
+  gpt-4o: [5.0, 15.0]
+  gpt-4o-mini: [0.15, 0.60]
+  gpt-4-turbo: [10.0, 30.0]

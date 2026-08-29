@@ -10,15 +10,8 @@ from pathlib import Path
 from PIL import Image
 
 from vlm_evaluation_harness.adapters.base import ConversationTurn, VLMResponse
+from vlm_evaluation_harness.pricing import get_pricing
 from vlm_evaluation_harness.retry import with_retries
-
-# Pricing as of 2026-04 (USD per 1M tokens)
-_PRICING: dict[str, tuple[float, float]] = {
-    "claude-opus-4-6": (15.0, 75.0),
-    "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-haiku-4-5": (0.80, 4.0),
-    "claude-haiku-4-5-20251001": (0.80, 4.0),
-}
 
 
 def _encode_image(image: Image.Image | str) -> dict:
@@ -69,8 +62,6 @@ def _build_messages(
 class AnthropicAdapter:
     """Adapter for Claude models via the Anthropic API."""
 
-    _PRICING = _PRICING
-
     def __init__(self, model_id: str = "claude-opus-4-6", api_key: str | None = None):
         try:
             import anthropic as _anthropic
@@ -99,12 +90,12 @@ class AnthropicAdapter:
     @property
     def cost_per_million_input_tokens(self) -> float | None:
         base = self._model_id.split("-20")[0]  # strip date suffix
-        return self._PRICING.get(base, (0.0, 0.0))[0]
+        return get_pricing("anthropic", base)[0]
 
     @property
     def cost_per_million_output_tokens(self) -> float | None:
         base = self._model_id.split("-20")[0]
-        return self._PRICING.get(base, (0.0, 0.0))[1]
+        return get_pricing("anthropic", base)[1]
 
     def _request_kwargs(
         self,
@@ -159,8 +150,6 @@ class AsyncAnthropicAdapter:
     outside this adapter's scope.
     """
 
-    _PRICING = _PRICING
-
     def __init__(self, model_id: str = "claude-opus-4-6", api_key: str | None = None):
         try:
             import anthropic as _anthropic
@@ -189,12 +178,12 @@ class AsyncAnthropicAdapter:
     @property
     def cost_per_million_input_tokens(self) -> float | None:
         base = self._model_id.split("-20")[0]
-        return self._PRICING.get(base, (0.0, 0.0))[0]
+        return get_pricing("anthropic", base)[0]
 
     @property
     def cost_per_million_output_tokens(self) -> float | None:
         base = self._model_id.split("-20")[0]
-        return self._PRICING.get(base, (0.0, 0.0))[1]
+        return get_pricing("anthropic", base)[1]
 
     async def agenerate(
         self,
