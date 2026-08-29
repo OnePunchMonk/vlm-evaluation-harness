@@ -49,6 +49,10 @@ class VLMResponse:
         )
 
 
+#: Normalization modes `ChoiceScores.argmax` understands.
+KNOWN_LL_NORMALIZATIONS = {"none", "length", "char_length"}
+
+
 @dataclass
 class ChoiceScores:
     """Log-probabilities assigned to each candidate continuation."""
@@ -60,8 +64,45 @@ class ChoiceScores:
     latency_ms: float = 0.0
     model_id: str = ""
 
-    def argmax(self, length_normalized: bool = True) -> int:
-        scores = self.logprobs_per_token if length_normalized else self.logprobs
+    def argmax(
+        self,
+        length_normalized: bool = True,
+        normalization: str | None = None,
+        char_lengths: list[int] | None = None,
+    ) -> int:
+        """Pick the winning choice under a log-probability normalization.
+
+        `normalization` (when given) takes priority over the legacy
+        `length_normalized` bool, kept for backward compatibility:
+          - "none": raw summed logprob. Favours short continuations.
+          - "length": logprob / token count (this class's default prior to
+            `normalization` existing, and the default here too).
+          - "char_length": logprob / character count of the continuation.
+            Useful when comparing choices whose tokenization diverges a lot
+            from their surface length (e.g. one choice tokenizes to far
+            fewer/more tokens per character than another). Requires
+            `char_lengths` (one int per choice, same order as `logprobs`).
+        """
+        mode = normalization if normalization is not None else (
+            "length" if length_normalized else "none"
+        )
+        if mode not in KNOWN_LL_NORMALIZATIONS:
+            raise ValueError(
+                f"unknown log-likelihood normalization {mode!r} "
+                f"(known: {sorted(KNOWN_LL_NORMALIZATIONS)})"
+            )
+        if mode == "none":
+            scores = self.logprobs
+        elif mode == "length":
+            scores = self.logprobs_per_token
+        else:  # char_length
+            if char_lengths is None or len(char_lengths) != len(self.logprobs):
+                raise ValueError(
+                    "normalization='char_length' requires char_lengths, one per choice"
+                )
+            scores = [
+                lp / max(1, n_chars) for lp, n_chars in zip(self.logprobs, char_lengths)
+            ]
         return max(range(len(scores)), key=scores.__getitem__)
 
 

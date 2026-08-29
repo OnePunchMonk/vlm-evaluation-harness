@@ -163,6 +163,9 @@ class BenchmarkManifest:
     # "loglikelihood": score each choice by log-probability and pick the best.
     #   Requires an adapter implementing `score_choices`; MC only.
     scoring: str = "generate"
+    # Only meaningful when scoring == "loglikelihood". See
+    # ChoiceScores.argmax in adapters/base.py for what each mode does.
+    scoring_normalization: str = "length"  # "none" | "length" | "char_length"
 
     fields: FieldsConfig = field(default_factory=FieldsConfig)
     image_config: ImageConfig = field(default_factory=ImageConfig)
@@ -233,6 +236,11 @@ class BenchmarkManifest:
             errors.append("scoring 'loglikelihood' requires task_type 'multiple_choice'")
         if self.scoring == "loglikelihood" and not self.fields.choices:
             errors.append("scoring 'loglikelihood' requires fields.choices")
+        if self.scoring_normalization not in {"none", "length", "char_length"}:
+            errors.append(
+                f"unknown scoring_normalization {self.scoring_normalization!r} "
+                "(known: 'none', 'length', 'char_length')"
+            )
 
         # Unresolvable template placeholders are the single most common way a
         # manifest silently sends garbage to the model.
@@ -412,6 +420,7 @@ class BenchmarkManifest:
             taxonomy_category=data.get("taxonomy_category", "perception"),
             tags=list(data.get("tags", [])),
             scoring=data.get("scoring", "generate"),
+            scoring_normalization=data.get("scoring_normalization", "length"),
             fields=fields,
             image_config=image_config,
             answer_extraction=answer_extraction,

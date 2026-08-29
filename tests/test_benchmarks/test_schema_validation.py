@@ -65,6 +65,21 @@ def test_loglikelihood_scoring_requires_multiple_choice():
         manifest.validate()
 
 
+def test_scoring_normalization_defaults_to_length():
+    assert _base_manifest().scoring_normalization == "length"
+
+
+def test_unknown_scoring_normalization_raises():
+    manifest = _base_manifest(scoring_normalization="pmi")
+    with pytest.raises(ManifestError, match="scoring_normalization"):
+        manifest.validate()
+
+
+def test_char_length_scoring_normalization_is_valid():
+    manifest = _base_manifest(scoring_normalization="char_length")
+    manifest.validate()  # should not raise
+
+
 def test_pairwise_matching_requires_second_template():
     manifest = _base_manifest(task_type="pairwise_matching")
     with pytest.raises(ManifestError, match="prompt_template_b"):

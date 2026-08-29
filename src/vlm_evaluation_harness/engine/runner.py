@@ -560,7 +560,12 @@ class EvalRunner:
 
         if manifest.scoring == "loglikelihood":
             return self._eval_loglikelihood(
-                formatted, sample_id, references, metadata or sample.metadata, image_hashes
+                formatted,
+                sample_id,
+                references,
+                metadata or sample.metadata,
+                image_hashes,
+                manifest.scoring_normalization,
             )
 
         n_samples = max(1, config.self_consistency_n)
@@ -637,18 +642,25 @@ class EvalRunner:
         references: list[str],
         metadata: dict[str, Any],
         image_hashes: list[str],
+        scoring_normalization: str = "length",
     ) -> SampleResult:
         choices = formatted.raw_fields.get("choices") or []
         if not choices:
             raise EvalError(f"sample {sample_id} has no choices to score")
 
+        str_choices = [str(c) for c in choices]
         scores = self._adapter.score_choices(
             images=formatted.images,
             prompt=formatted.text,
-            choices=[str(c) for c in choices],
+            choices=str_choices,
             system=formatted.system,
         )
-        best = scores.argmax(length_normalized=True)
+        best = scores.argmax(
+            normalization=scoring_normalization,
+            char_lengths=(
+                [len(c) for c in str_choices] if scoring_normalization == "char_length" else None
+            ),
+        )
         letter = self._formatter.format_choices(choices).splitlines()[best].split(".")[0]
 
         return SampleResult(
