@@ -101,7 +101,7 @@ class EvalResult:
                 "id": s.sample_id,
                 "prediction": s.prediction,
                 "reference": s.reference,
-                "correct": s.prediction == s.reference if s.reference else None,
+                "correct": s.prediction == s.reference if s.reference is not None else None,
                 "confident": s.confident,
                 "latency_ms": s.latency_ms,
                 "image_hashes": s.image_hashes,

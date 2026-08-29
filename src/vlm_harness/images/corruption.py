@@ -63,7 +63,7 @@ def apply_corruption(image: Image.Image, corruption: str, severity: int = 2) -> 
 
     elif corruption == "resolution_2x":
         w, h = image.size
-        small = image.resize((w // 2, h // 2), Image.Resampling.LANCZOS)
+        small = image.resize((max(1, w // 2), max(1, h // 2)), Image.Resampling.LANCZOS)
         return small.resize((w, h), Image.Resampling.NEAREST)
 
     elif corruption == "resolution_4x":

@@ -95,8 +95,9 @@ class AnthropicAdapter:
         response = self._client.messages.create(**kwargs)
         latency_ms = (time.perf_counter() - t0) * 1000
 
+        text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
         return VLMResponse(
-            text=response.content[0].text,
+            text=text_blocks[0] if text_blocks else "",
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
             latency_ms=latency_ms,

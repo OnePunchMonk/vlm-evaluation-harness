@@ -91,7 +91,7 @@ class AnswerExtractor:
         """Extract an 'answer' field from a JSON response."""
         import json
         # Try to find JSON block in the output
-        m = re.search(r"\{.*?\}", text, re.DOTALL)
+        m = re.search(r"\{.*\}", text, re.DOTALL)
         if m:
             try:
                 data = json.loads(m.group(0))

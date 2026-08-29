@@ -48,7 +48,7 @@ class GenEvalClipMetric:
 
         for image, checks in zip(images, checks_list):
             checks = checks or {}
-            all_ok = True
+            all_ok = bool(checks)
 
             if "color" in checks:
                 candidates = [f"a photo with the color {c}" for c in _COLORS]

@@ -46,13 +46,19 @@ def get_adapter(model_spec: str, **kwargs) -> VLMAdapter:
     try:
         import importlib
         module = importlib.import_module(module_path)
-        adapter_cls = getattr(module, class_name)
-    except ImportError as e:
+    except ModuleNotFoundError as e:
+        if e.name == module_path:
+            raise NotImplementedError(
+                f"Provider '{provider}' is registered but not yet implemented "
+                f"(module '{module_path}' does not exist)."
+            ) from e
         raise ImportError(
             f"Could not import adapter for provider '{provider}'. "
             f"Install the required extras: pip install vlm-harness[{provider}]\n"
             f"Original error: {e}"
         ) from e
+
+    adapter_cls = getattr(module, class_name)
 
     return adapter_cls(model_id=model_id, **kwargs)
 

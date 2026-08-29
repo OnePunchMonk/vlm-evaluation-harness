@@ -47,8 +47,8 @@ def _leaderboard_rows(results: list[dict]) -> tuple[list[str], str]:
         for name in metric_cols:
             val = r.get("metrics", {}).get(name)
             cells.append(f"<td>{val:.4f}</td>" if val is not None else "<td>—</td>")
-        cost = r.get("cost", {}).get("total_usd", 0.0)
-        cells.append(f"<td>${cost:.4f}</td>" if cost else "<td>—</td>")
+        cost = r.get("cost", {}).get("total_usd")
+        cells.append(f"<td>${cost:.4f}</td>" if cost is not None else "<td>—</td>")
         cells.append(f"<td>{r.get('n_samples', 0)}</td>")
         rows += f"<tr>{''.join(cells)}</tr>"
     return metric_cols, rows
