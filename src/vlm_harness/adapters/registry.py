@@ -14,6 +14,7 @@ _PROVIDERS: dict[str, str] = {
     "vllm": "vlm_harness.adapters.vllm.VLLMAdapter",
     "ollama": "vlm_harness.adapters.ollama.OllamaAdapter",
     "litellm": "vlm_harness.adapters.litellm.LiteLLMAdapter",
+    "openai-compatible": "vlm_harness.adapters.openai_compatible.OpenAICompatibleAdapter",
 }
 
 

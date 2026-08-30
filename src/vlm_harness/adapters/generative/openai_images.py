@@ -64,13 +64,17 @@ class OpenAIImageAdapter:
         )
         latency_ms = (time.perf_counter() - t0) * 1000
 
+        if not response.data:
+            raise RuntimeError("OpenAI Images API returned no image data")
         item = response.data[0]
-        if getattr(item, "b64_json", None):
+        if item.b64_json:
             image = Image.open(io.BytesIO(base64.b64decode(item.b64_json)))
-        else:
+        elif item.url:
             import httpx
 
             image = Image.open(io.BytesIO(httpx.get(item.url).content))
+        else:
+            raise RuntimeError("OpenAI Images API response had neither b64_json nor url")
 
         return T2IResponse(
             image=image.convert("RGB"),

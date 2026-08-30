@@ -32,6 +32,12 @@ def eval(
         help="Samples per generate_batch() call. 'auto' probes GPU memory and "
         "backs off on OOM (HuggingFace adapter only).",
     ),
+    base_url: str | None = typer.Option(
+        None,
+        "--base-url",
+        help="Endpoint URL for the 'openai-compatible' provider "
+        "(Ollama, TGI, LM Studio, vLLM's OpenAI-compat mode, ...).",
+    ),
 ):
     """Evaluate a model on one or more benchmarks."""
     from vlm_harness.adapters.registry import get_adapter
@@ -42,7 +48,11 @@ def eval(
     parsed_batch_size: int | str = "auto" if batch_size == "auto" else int(batch_size)
 
     provider = model.split(":", 1)[0].lower()
-    adapter_kwargs = {"batch_size": parsed_batch_size} if provider in ("huggingface", "hf") else {}
+    adapter_kwargs: dict = {}
+    if provider in ("huggingface", "hf"):
+        adapter_kwargs["batch_size"] = parsed_batch_size
+    elif provider == "openai-compatible" and base_url:
+        adapter_kwargs["base_url"] = base_url
     adapter = get_adapter(model, **adapter_kwargs)
     runner = EvalRunner(adapter)
     benchmarks = [b.strip() for b in bench.split(",")]

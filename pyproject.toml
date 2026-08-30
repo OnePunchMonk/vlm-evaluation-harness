@@ -26,6 +26,9 @@ dependencies = [
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.30.0"]
 openai = ["openai>=1.30.0"]
+# Ollama/TGI/LM Studio/vLLM's OpenAI-compat mode -- same SDK, just a
+# different base_url, so this is the same dependency as `openai`.
+openai-compatible = ["openai>=1.30.0"]
 google = ["google-generativeai>=0.7.0"]
 huggingface = ["transformers>=4.40.0", "torch>=2.0.0", "accelerate>=0.30.0"]
 vllm = ["vllm>=0.4.0"]
