@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import string
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -73,9 +72,7 @@ class PromptFormatter:
             lines.append(f"{letter}. {choice}")
         return "\n".join(lines)
 
-    def _render_few_shot(
-        self, examples: list[dict], manifest: BenchmarkManifest
-    ) -> str:
+    def _render_few_shot(self, examples: list[dict], manifest: BenchmarkManifest) -> str:
         parts = []
         for ex in examples:
             text = manifest.prompt_template.format_map(_SafeDict(ex))

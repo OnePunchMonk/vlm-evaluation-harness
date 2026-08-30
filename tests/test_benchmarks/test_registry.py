@@ -1,7 +1,8 @@
 """Tests for the benchmark registry."""
 
 import pytest
-from vlm_harness.benchmarks.registry import BenchmarkRegistry, get_registry
+
+from vlm_harness.benchmarks.registry import BenchmarkRegistry
 
 
 def test_registry_loads_builtins():

@@ -5,10 +5,20 @@ from vlm_harness.tracking.history import HistoryEntry
 from vlm_harness.tracking.regression import compare_entries
 
 _RESULTS = [
-    {"model": "mock:v1", "benchmark": "DemoMC", "metrics": {"accuracy": 0.5},
-     "cost": {"total_usd": 0.0}, "n_samples": 12},
-    {"model": "mock:v2", "benchmark": "DemoMC", "metrics": {"accuracy": 0.7},
-     "cost": {"total_usd": 0.0}, "n_samples": 12},
+    {
+        "model": "mock:v1",
+        "benchmark": "DemoMC",
+        "metrics": {"accuracy": 0.5},
+        "cost": {"total_usd": 0.0},
+        "n_samples": 12,
+    },
+    {
+        "model": "mock:v2",
+        "benchmark": "DemoMC",
+        "metrics": {"accuracy": 0.7},
+        "cost": {"total_usd": 0.0},
+        "n_samples": 12,
+    },
 ]
 
 
@@ -32,9 +42,7 @@ def test_save_html_report_includes_regression_section(tmp_path):
     base = HistoryEntry(
         "r1", "t", "mock:v1", "DemoMC", "s", "discriminative", {"accuracy": 0.9}, 12
     )
-    cur = HistoryEntry(
-        "r2", "t", "mock:v2", "DemoMC", "s", "discriminative", {"accuracy": 0.5}, 12
-    )
+    cur = HistoryEntry("r2", "t", "mock:v2", "DemoMC", "s", "discriminative", {"accuracy": 0.5}, 12)
     deltas = compare_entries(base, cur)
 
     path = save_html_report(_RESULTS, deltas=deltas, path=tmp_path / "report.html")

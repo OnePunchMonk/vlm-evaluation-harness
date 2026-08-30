@@ -37,14 +37,13 @@ def get_adapter(model_spec: str, **kwargs) -> VLMAdapter:
 
     if provider not in _PROVIDERS:
         available = ", ".join(sorted(_PROVIDERS))
-        raise ValueError(
-            f"Unknown provider '{provider}'. Available providers: {available}"
-        )
+        raise ValueError(f"Unknown provider '{provider}'. Available providers: {available}")
 
     module_path, class_name = _PROVIDERS[provider].rsplit(".", 1)
 
     try:
         import importlib
+
         module = importlib.import_module(module_path)
     except ModuleNotFoundError as e:
         if e.name == module_path:

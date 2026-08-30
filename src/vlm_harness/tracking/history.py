@@ -114,9 +114,7 @@ class HistoryStore:
                     entries.append(HistoryEntry.from_dict(json.loads(line)))
         return entries
 
-    def query(
-        self, model: str | None = None, benchmark: str | None = None
-    ) -> list[HistoryEntry]:
+    def query(self, model: str | None = None, benchmark: str | None = None) -> list[HistoryEntry]:
         entries = self.all()
         if model:
             entries = [e for e in entries if e.model == model]

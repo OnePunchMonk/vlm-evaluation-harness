@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
 from tqdm import tqdm
 
 from vlm_harness.adapters.base import VLMAdapter
@@ -140,8 +141,8 @@ class EvalRunner:
         sample_results: list[SampleResult] = []
 
         for sample in tqdm(samples, desc=f"Evaluating {manifest.name}"):
-            result = self._eval_sample(sample, manifest, config, cost_tracker)
-            sample_results.append(result)
+            sample_result = self._eval_sample(sample, manifest, config, cost_tracker)
+            sample_results.append(sample_result)
 
         finished_at = datetime.now(timezone.utc).isoformat()
 
@@ -177,7 +178,7 @@ class EvalRunner:
     ) -> SampleResult:
         # Process images
         processed = self._image_pipeline.process_batch(sample.images)
-        images = [p.image for p in processed]
+        images: list[Image.Image | str] = [p.image for p in processed]
         image_hashes = [p.hash for p in processed]
 
         # Format prompt

@@ -27,30 +27,33 @@ def compute_metrics(
     metric_configs: list,
 ) -> list[MetricResult]:
     """Dispatch and compute all configured metrics."""
-    from vlm_harness.metrics.accuracy import AccuracyMetric
-    from vlm_harness.metrics.nlp import F1Metric, ANLSMetric, BLEUMetric, RougeMetric
     from vlm_harness.benchmarks.schema import MetricConfig
+    from vlm_harness.metrics.accuracy import AccuracyMetric
+    from vlm_harness.metrics.nlp import ANLSMetric, BLEUMetric, F1Metric, RougeMetric
 
     results = []
+    metric: Any
     for cfg in metric_configs:
         if not isinstance(cfg, MetricConfig):
             continue
         if cfg.type == "accuracy":
-            m = AccuracyMetric()
-            results.append(m.compute(predictions, references, metadata))
+            metric = AccuracyMetric()
+            results.append(metric.compute(predictions, references, metadata))
         elif cfg.type == "accuracy_by_group" and cfg.group_field:
-            m = AccuracyMetric()
-            results.append(m.compute_by_group(predictions, references, metadata, cfg.group_field))
+            metric = AccuracyMetric()
+            results.append(
+                metric.compute_by_group(predictions, references, metadata, cfg.group_field)
+            )
         elif cfg.type == "f1":
-            m = F1Metric()
-            results.append(m.compute(predictions, references, metadata))
+            metric = F1Metric()
+            results.append(metric.compute(predictions, references, metadata))
         elif cfg.type == "anls":
-            m = ANLSMetric()
-            results.append(m.compute(predictions, references, metadata))
+            metric = ANLSMetric()
+            results.append(metric.compute(predictions, references, metadata))
         elif cfg.type == "bleu":
-            m = BLEUMetric()
-            results.append(m.compute(predictions, references, metadata))
+            metric = BLEUMetric()
+            results.append(metric.compute(predictions, references, metadata))
         elif cfg.type == "rouge":
-            m = RougeMetric()
-            results.append(m.compute(predictions, references, metadata))
+            metric = RougeMetric()
+            results.append(metric.compute(predictions, references, metadata))
     return results

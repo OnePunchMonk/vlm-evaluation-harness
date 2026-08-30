@@ -38,6 +38,7 @@ def get_t2i_adapter(model_spec: str, **kwargs) -> T2IAdapter:
 
     try:
         import importlib
+
         module = importlib.import_module(module_path)
         adapter_cls = getattr(module, class_name)
     except ImportError as e:

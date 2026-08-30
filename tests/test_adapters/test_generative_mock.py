@@ -23,9 +23,7 @@ def test_defaults_when_prompt_has_no_attributes():
 def test_degraded_model_id_corrupts_a_meaningful_fraction():
     adapter = MockT2IAdapter(model_id="my-model-degraded")
     prompts = [f"a photo of two blue squares, variant {i}" for i in range(50)]
-    corrupted = sum(
-        adapter.generate(p).metadata["corrupted"] for p in prompts
-    )
+    corrupted = sum(adapter.generate(p).metadata["corrupted"] for p in prompts)
     assert corrupted > 0  # error_rate=0.6 should trip on some of 50 prompts
 
 

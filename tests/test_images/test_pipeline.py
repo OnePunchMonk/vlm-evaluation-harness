@@ -2,8 +2,9 @@
 
 import pytest
 from PIL import Image
+
+from vlm_harness.images.corruption import CORRUPTION_NAMES, apply_corruption
 from vlm_harness.images.pipeline import ImagePipeline, ImagePipelineConfig
-from vlm_harness.images.corruption import apply_corruption, CORRUPTION_NAMES
 
 
 def make_image(w=512, h=512, color=(128, 64, 200)):
@@ -74,6 +75,7 @@ class TestCorruption:
 
     def test_blur_produces_different_image(self):
         import numpy as np
+
         # Use a non-solid image so blur actually changes pixel values
         img = Image.new("RGB", (64, 64))
         pixels = img.load()

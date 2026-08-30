@@ -1,8 +1,6 @@
 """Tests for accuracy metrics."""
 
-import pytest
 from vlm_harness.metrics.accuracy import AccuracyMetric
-
 
 metric = AccuracyMetric()
 
@@ -25,7 +23,7 @@ def test_partial_accuracy():
 
 def test_accuracy_by_group():
     preds = ["A", "B", "C", "D"]
-    refs =  ["A", "X", "C", "X"]
+    refs = ["A", "X", "C", "X"]
     meta = [{"subject": "math"}, {"subject": "math"}, {"subject": "art"}, {"subject": "art"}]
     result = metric.compute_by_group(preds, refs, meta, "subject")
     assert result.breakdown["math"] == 0.5

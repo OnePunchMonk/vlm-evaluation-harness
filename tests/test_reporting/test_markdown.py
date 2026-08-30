@@ -9,8 +9,13 @@ from vlm_harness.tracking.history import HistoryEntry
 from vlm_harness.tracking.regression import compare_entries
 
 _RESULTS = [
-    {"model": "mock:v1", "benchmark": "DemoMC", "metrics": {"accuracy": 0.5},
-     "cost": {"total_usd": 0.0}, "n_samples": 12},
+    {
+        "model": "mock:v1",
+        "benchmark": "DemoMC",
+        "metrics": {"accuracy": 0.5},
+        "cost": {"total_usd": 0.0},
+        "n_samples": 12,
+    },
 ]
 
 

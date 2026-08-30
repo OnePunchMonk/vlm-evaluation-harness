@@ -29,7 +29,9 @@ class HuggingFaceAdapter:
             # transformers >=4.46 renamed this; keep working on older pins too.
             from transformers import AutoModelForImageTextToText as _AutoModelForVLM
         except ImportError:
-            from transformers import AutoModelForVision2Seq as _AutoModelForVLM
+            from transformers import AutoModelForVision2Seq  # type: ignore[attr-defined]
+
+            _AutoModelForVLM = AutoModelForVision2Seq  # type: ignore[misc,no-redef]
         from transformers import AutoProcessor
 
         dtype_map = {
@@ -88,9 +90,7 @@ class HuggingFaceAdapter:
     ) -> VLMResponse:
         import torch
 
-        pil_images = [
-            Image.open(img) if isinstance(img, str) else img for img in images
-        ]
+        pil_images = [Image.open(img) if isinstance(img, str) else img for img in images]
 
         full_prompt = (f"{system}\n\n" if system else "") + prompt
 
@@ -109,7 +109,7 @@ class HuggingFaceAdapter:
 
         t0 = time.perf_counter()
         with torch.no_grad():
-            output_ids = self._model.generate(**inputs, **gen_kwargs)
+            output_ids = self._model.generate(**inputs, **gen_kwargs)  # type: ignore[misc]
         latency_ms = (time.perf_counter() - t0) * 1000
 
         input_len = inputs["input_ids"].shape[-1]
@@ -156,8 +156,7 @@ class HuggingFaceAdapter:
                 for r in requests
             ]
             full_prompts = [
-                (f"{r['system']}\n\n" if r.get("system") else "") + r["prompt"]
-                for r in requests
+                (f"{r['system']}\n\n" if r.get("system") else "") + r["prompt"] for r in requests
             ]
 
             inputs = self._processor(
@@ -178,7 +177,7 @@ class HuggingFaceAdapter:
 
         t0 = time.perf_counter()
         with torch.no_grad():
-            output_ids = self._model.generate(**inputs, **gen_kwargs)
+            output_ids = self._model.generate(**inputs, **gen_kwargs)  # type: ignore[misc]
         latency_ms = (time.perf_counter() - t0) * 1000
 
         input_len = inputs["input_ids"].shape[-1]

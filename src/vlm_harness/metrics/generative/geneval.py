@@ -80,9 +80,7 @@ class GenEvalClipMetric:
             strict_correct += int(all_ok)
 
         n = len(images)
-        breakdown = {
-            k: (attr_hits[k] / attr_total[k] if attr_total[k] else 0.0) for k in attr_hits
-        }
+        breakdown = {k: (attr_hits[k] / attr_total[k] if attr_total[k] else 0.0) for k in attr_hits}
         return MetricResult(
             metric_name="geneval_clip",
             value=strict_correct / n if n else 0.0,

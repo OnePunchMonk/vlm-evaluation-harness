@@ -25,6 +25,7 @@ def test_full_offline_generative_run(tmp_path):
     saved = list(tmp_path.glob("*_results.json"))
     assert len(saved) == 1
     import json
+
     data = json.loads(saved[0].read_text())
     assert data["benchmark"] == "GenJudgeMini"
     assert data["n_samples"] == 3

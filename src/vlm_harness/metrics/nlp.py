@@ -86,6 +86,7 @@ class BLEUMetric:
     ) -> MetricResult:
         try:
             import sacrebleu
+
             result = sacrebleu.corpus_bleu(predictions, [references])
             return MetricResult(
                 metric_name="bleu",
@@ -119,6 +120,7 @@ class RougeMetric:
     ) -> MetricResult:
         try:
             from rouge_score import rouge_scorer
+
             scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
             scores = [
                 scorer.score(ref, pred)["rougeL"].fmeasure
@@ -149,5 +151,9 @@ class RougeMetric:
         dp = [[0] * (n + 1) for _ in range(m + 1)]
         for i in range(1, m + 1):
             for j in range(1, n + 1):
-                dp[i][j] = dp[i-1][j-1] + 1 if x[i-1] == y[j-1] else max(dp[i-1][j], dp[i][j-1])
+                dp[i][j] = (
+                    dp[i - 1][j - 1] + 1
+                    if x[i - 1] == y[j - 1]
+                    else max(dp[i - 1][j], dp[i][j - 1])
+                )
         return dp[m][n]

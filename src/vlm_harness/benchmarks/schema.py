@@ -118,7 +118,9 @@ class BenchmarkManifest:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> BenchmarkManifest:
         source = SourceConfig(**data["source"])
-        splits = [SplitConfig(**s) if isinstance(s, dict) else SplitConfig(name=s) for s in data["splits"]]
+        splits = [
+            SplitConfig(**s) if isinstance(s, dict) else SplitConfig(name=s) for s in data["splits"]
+        ]
 
         fields_data = data.get("fields", {})
         fields = FieldsConfig(

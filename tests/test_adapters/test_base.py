@@ -1,7 +1,6 @@
 """Tests for adapter base types."""
 
-import pytest
-from vlm_harness.adapters.base import VLMResponse, ConversationTurn
+from vlm_harness.adapters.base import ConversationTurn, VLMResponse
 
 
 def test_vlm_response_total_tokens():
@@ -26,6 +25,7 @@ def test_conversation_turn():
 
 def test_conversation_turn_with_images():
     from PIL import Image
+
     img = Image.new("RGB", (100, 100))
     turn = ConversationTurn(role="user", text="Describe", images=[img])
     assert len(turn.images) == 1

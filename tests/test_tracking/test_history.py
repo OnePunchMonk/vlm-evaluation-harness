@@ -6,8 +6,11 @@ from vlm_harness.tracking.history import HistoryStore
 def test_record_and_query_roundtrip(tmp_path):
     store = HistoryStore(path=tmp_path / "history.jsonl")
     store.record(
-        model="mock:v1", benchmark="DemoMC", split="validation",
-        metrics={"accuracy": 0.5}, n_samples=12,
+        model="mock:v1",
+        benchmark="DemoMC",
+        split="validation",
+        metrics={"accuracy": 0.5},
+        n_samples=12,
     )
     entries = store.query(model="mock:v1")
     assert len(entries) == 1
@@ -55,8 +58,13 @@ def test_all_on_missing_file_returns_empty(tmp_path):
 def test_record_result_uses_result_to_dict(tmp_path):
     class FakeResult:
         def to_dict(self):
-            return {"model": "mock:v1", "benchmark": "A", "split": "s",
-                     "metrics": {"accuracy": 0.5}, "n_samples": 3}
+            return {
+                "model": "mock:v1",
+                "benchmark": "A",
+                "split": "s",
+                "metrics": {"accuracy": 0.5},
+                "n_samples": 3,
+            }
 
     store = HistoryStore(path=tmp_path / "history.jsonl")
     entry = store.record_result(FakeResult(), modality="generative")

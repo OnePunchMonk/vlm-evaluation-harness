@@ -11,10 +11,10 @@ from vlm_harness.parsing.normalizer import normalize_answer
 
 @dataclass
 class ExtractionResult:
-    raw: str          # original model output
-    extracted: str    # extracted answer before normalization
-    normalized: str   # after normalization
-    confident: bool   # whether extraction was unambiguous
+    raw: str  # original model output
+    extracted: str  # extracted answer before normalization
+    normalized: str  # after normalization
+    confident: bool  # whether extraction was unambiguous
 
 
 class AnswerExtractor:
@@ -90,6 +90,7 @@ class AnswerExtractor:
     def _json_field(self, text: str) -> tuple[str, bool]:
         """Extract an 'answer' field from a JSON response."""
         import json
+
         # Try to find JSON block in the output
         m = re.search(r"\{.*\}", text, re.DOTALL)
         if m:

@@ -181,7 +181,7 @@ def estimate_cost(
         return
 
     # Try to get dataset size
-    n_samples = "unknown"
+    n_samples: int | str = "unknown"
     try:
         ds = load_dataset(manifest.source.path, manifest.source.subset, split=split)
         n_samples = len(ds)
@@ -211,6 +211,7 @@ def reproduce(
 ):
     """Re-run an evaluation from a saved results manifest."""
     import json
+
     data = json.loads(manifest_file.read_text())
     console.print(f"Reproducing: {data.get('benchmark')} with {data.get('model')}")
     eval(
@@ -332,8 +333,12 @@ def regression(
     from rich import box
     from rich.table import Table
 
-    table = Table(box=box.ROUNDED, show_header=True, header_style="bold",
-                  title=f"{baseline}  →  {current}  (threshold {threshold:.1%})")
+    table = Table(
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold",
+        title=f"{baseline}  →  {current}  (threshold {threshold:.1%})",
+    )
     table.add_column("Benchmark", style="cyan")
     table.add_column("Metric")
     table.add_column("Baseline", justify="right")
@@ -342,14 +347,22 @@ def regression(
     table.add_column("Severity")
 
     severity_style = {
-        "CRITICAL": "bold red", "HIGH": "red", "MEDIUM": "yellow",
-        "LOW": "blue", "MINIMAL": "dim", "OK": "green",
+        "CRITICAL": "bold red",
+        "HIGH": "red",
+        "MEDIUM": "yellow",
+        "LOW": "blue",
+        "MINIMAL": "dim",
+        "OK": "green",
     }
     for d in deltas:
         style = severity_style.get(d.severity, "")
         table.add_row(
-            d.benchmark, d.metric_name, f"{d.baseline_value:.4f}", f"{d.current_value:.4f}",
-            f"{d.delta:+.4f}", f"[{style}]{d.severity}[/{style}]",
+            d.benchmark,
+            d.metric_name,
+            f"{d.baseline_value:.4f}",
+            f"{d.current_value:.4f}",
+            f"{d.delta:+.4f}",
+            f"[{style}]{d.severity}[/{style}]",
         )
     console.print(table)
 
@@ -363,8 +376,13 @@ def regression(
         if output.suffix == ".md":
             output.write_text(build_regression_markdown(deltas, threshold))
         else:
-            save_html_report([], deltas=deltas, threshold=threshold, path=output,
-                              title=f"Regression Report — {baseline} vs {current}")
+            save_html_report(
+                [],
+                deltas=deltas,
+                threshold=threshold,
+                path=output,
+                title=f"Regression Report — {baseline} vs {current}",
+            )
         console.print(f"[green]Report saved to {output}[/green]")
 
     if flagged:

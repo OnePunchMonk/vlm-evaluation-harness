@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import random
 
 from PIL import Image, ImageFilter
 
@@ -33,6 +32,7 @@ def apply_corruption(image: Image.Image, corruption: str, severity: int = 2) -> 
 
     elif corruption == "gaussian_noise":
         import numpy as np
+
         sigma = [5, 10, 25, 40, 60][severity - 1]
         arr = np.array(image).astype(np.float32)
         noise = np.random.normal(0, sigma, arr.shape)

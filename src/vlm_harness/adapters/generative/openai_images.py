@@ -69,6 +69,7 @@ class OpenAIImageAdapter:
             image = Image.open(io.BytesIO(base64.b64decode(item.b64_json)))
         else:
             import httpx
+
             image = Image.open(io.BytesIO(httpx.get(item.url).content))
 
         return T2IResponse(

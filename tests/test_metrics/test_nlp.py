@@ -1,7 +1,6 @@
 """Tests for NLP metrics."""
 
-import pytest
-from vlm_harness.metrics.nlp import F1Metric, ANLSMetric, RougeMetric
+from vlm_harness.metrics.nlp import ANLSMetric, F1Metric, RougeMetric
 
 
 class TestF1Metric:

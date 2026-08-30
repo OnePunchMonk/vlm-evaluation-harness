@@ -6,8 +6,14 @@ from vlm_harness.tracking.regression import compare_entries, compare_models
 
 def _entry(model, benchmark, metrics):
     return HistoryEntry(
-        run_id="r", timestamp="t", model=model, benchmark=benchmark, split="s",
-        modality="discriminative", metrics=metrics, n_samples=10,
+        run_id="r",
+        timestamp="t",
+        model=model,
+        benchmark=benchmark,
+        split="s",
+        modality="discriminative",
+        metrics=metrics,
+        n_samples=10,
     )
 
 

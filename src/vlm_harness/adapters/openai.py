@@ -63,12 +63,12 @@ class OpenAIAdapter:
         max_tokens: int = 1024,
         temperature: float = 0.0,
     ) -> VLMResponse:
-        content = []
+        content: list[dict] = []
         for img in images:
             content.append(self._encode_image(img))
         content.append({"type": "text", "text": prompt})
 
-        messages = []
+        messages: list[dict] = []
         if system:
             messages.append({"role": "system", "content": system})
         if history:

@@ -83,8 +83,11 @@ class BenchmarkLoader:
             dataset = dataset.select(range(min(max_samples, len(dataset))))
 
         fields = manifest.fields
+        image_field_names = (
+            fields.image_fields if hasattr(fields, "image_fields") else fields.images
+        )
         for idx, row in enumerate(dataset):
-            images = self._extract_images(row, fields.image_fields if hasattr(fields, 'image_fields') else fields.images)
+            images = self._extract_images(row, image_field_names)
             text_fields = {
                 "question": row.get(fields.question, ""),
                 "choices": row.get(fields.choices, None) if fields.choices else None,
@@ -163,6 +166,7 @@ class BenchmarkLoader:
                 continue
             # HuggingFace datasets return PIL images directly
             from PIL import Image
+
             if isinstance(val, Image.Image):
                 images.append(val)
             elif isinstance(val, (str, Path)):
@@ -173,5 +177,6 @@ class BenchmarkLoader:
                     images.append(Image.open(p))
             elif isinstance(val, bytes):
                 import io
+
                 images.append(Image.open(io.BytesIO(val)))
         return images

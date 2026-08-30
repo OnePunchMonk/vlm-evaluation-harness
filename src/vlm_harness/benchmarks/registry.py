@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from pathlib import Path
 
 import yaml
@@ -35,6 +36,7 @@ class BenchmarkRegistry:
                 self._manifests[yaml_file.stem.lower()] = manifest
             except Exception as e:
                 import warnings
+
                 warnings.warn(f"Failed to load benchmark manifest {yaml_file}: {e}")
 
     def _load_file(self, path: Path) -> BenchmarkManifest:
@@ -49,13 +51,17 @@ class BenchmarkRegistry:
         key = name.lower().replace(" ", "_").replace("-", "_")
         if key not in self._manifests:
             available = sorted(set(self._manifests.keys()))
-            raise KeyError(
-                f"Benchmark '{name}' not found. Available: {available}"
-            )
+            raise KeyError(f"Benchmark '{name}' not found. Available: {available}")
         return self._manifests[key]
 
-    def list(self) -> list[str]:
-        """Return unique benchmark names (deduplicated)."""
+    def list(self) -> builtins.list[str]:
+        """Return unique benchmark names (deduplicated).
+
+        Return type is spelled `builtins.list[str]`, not `list[str]` --
+        inside this method's own class body, the bare name `list` resolves
+        to this method itself (it shadows the builtin in class scope),
+        which mypy correctly refuses to treat as a type.
+        """
         seen: set[str] = set()
         result = []
         for manifest in self._manifests.values():
@@ -64,7 +70,7 @@ class BenchmarkRegistry:
                 result.append(manifest.name)
         return sorted(result)
 
-    def list_by_category(self) -> dict[str, list[str]]:
+    def list_by_category(self) -> dict[str, builtins.list[str]]:
         """Return benchmark names grouped by taxonomy category."""
         categories: dict[str, list[str]] = {}
         seen: set[str] = set()

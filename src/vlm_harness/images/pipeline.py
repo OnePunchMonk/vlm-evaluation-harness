@@ -36,6 +36,7 @@ class ImagePipeline:
     def process(self, image: Image.Image | str) -> ProcessedImage:
         if isinstance(image, str):
             from pathlib import Path
+
             image = Image.open(Path(image))
 
         original_size = image.size
@@ -49,18 +50,14 @@ class ImagePipeline:
         min_w, min_h = self.config.min_resolution
         if w < min_w or h < min_h:
             scale = max(min_w / w, min_h / h)
-            image = image.resize(
-                (int(w * scale), int(h * scale)), Image.Resampling.LANCZOS
-            )
+            image = image.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
         # Enforce maximum resolution (maintain aspect ratio)
         w, h = image.size
         max_w, max_h = self.config.max_resolution
         if w > max_w or h > max_h:
             scale = min(max_w / w, max_h / h)
-            image = image.resize(
-                (int(w * scale), int(h * scale)), Image.Resampling.LANCZOS
-            )
+            image = image.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
         final_size = image.size
         img_hash = self._hash(image)

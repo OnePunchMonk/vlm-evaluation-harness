@@ -6,8 +6,7 @@ from vlm_harness.adapters.mock import MockAdapter
 def test_answers_multiple_choice_with_an_offered_letter():
     adapter = MockAdapter(model_id="test-v1")
     prompt = (
-        "What color?\n\nOptions:\nA. Red\nB. Blue\nC. Green\n\n"
-        "Answer with the option letter only."
+        "What color?\n\nOptions:\nA. Red\nB. Blue\nC. Green\n\nAnswer with the option letter only."
     )
     response = adapter.generate(images=[], prompt=prompt)
     assert response.text in {"A", "B", "C"}

@@ -36,7 +36,13 @@ _COLOR_MAP: dict[str, tuple[int, int, int]] = {
 _COLOR_NAMES = list(_COLOR_MAP)
 _SHAPES = ("circle", "square", "triangle")
 _NUM_WORDS = {
-    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
 }
 
 

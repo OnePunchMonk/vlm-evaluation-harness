@@ -1,6 +1,5 @@
 """Tests for hallucination metrics."""
 
-import pytest
 from vlm_harness.metrics.hallucination import CHAIRMetric, POPEMetric
 
 

@@ -15,7 +15,8 @@ from pathlib import Path
 import yaml
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-_MANIFEST_DIR = Path(__file__).resolve().parent.parent / "src" / "vlm_harness" / "benchmarks" / "manifests"
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_MANIFEST_DIR = _REPO_ROOT / "src" / "vlm_harness" / "benchmarks" / "manifests"
 
 
 def main() -> int:
