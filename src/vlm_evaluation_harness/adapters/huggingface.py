@@ -51,9 +51,17 @@ class HuggingFaceAdapter:
     ):
         try:
             import torch as _torch
-            from transformers import AutoModelForVision2Seq, AutoProcessor
+            from transformers import AutoProcessor
         except ImportError:
             raise ImportError("pip install vlm-evaluation-harness[huggingface]")
+
+        try:
+            # transformers >=4.46 renamed this; keep working on older pins too.
+            from transformers import AutoModelForImageTextToText as _AutoModelForVLM
+        except ImportError:
+            from transformers import AutoModelForVision2Seq  # type: ignore[attr-defined]
+
+            _AutoModelForVLM = AutoModelForVision2Seq  # type: ignore[misc]
 
         dtype_map = {
             "auto": "auto",
@@ -86,7 +94,7 @@ class HuggingFaceAdapter:
         self._processor = AutoProcessor.from_pretrained(
             model_id, trust_remote_code=trust_remote_code
         )
-        self._model = AutoModelForVision2Seq.from_pretrained(
+        self._model = _AutoModelForVLM.from_pretrained(
             model_id,
             device_map=resolved_device_map,
             torch_dtype=dtype,
