@@ -115,7 +115,3 @@ ruff check src/ tests/
 ```
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contributor workflow.
-`vlm_regcheck/` is a separate, more specialized prototype for
-base-vs-finetuned regression checks on local HuggingFace VLMs (own CLI, own
-benchmark set); it predates and is independent of the tracking system
-described above.
