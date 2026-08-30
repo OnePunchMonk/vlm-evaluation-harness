@@ -71,6 +71,11 @@ class SourceConfig:
     path: str
     revision: str = "main"
     subset: str | None = None
+    # Required whenever revision is a mutable ref (e.g. "main") instead of a
+    # pinned commit sha — explains why it can't be pinned yet (e.g. the
+    # dataset is gated and needs manual acceptance before its sha can be
+    # fetched). Enforced by scripts/check_pinned_revisions.py.
+    revision_note: str | None = None
 
 
 @dataclass

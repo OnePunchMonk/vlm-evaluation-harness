@@ -10,7 +10,7 @@ modality: 2d
 source:
   type: huggingface
   path: facebook/textvqa
-  revision: main
+  revision: 30a47cfa557c996f64903f01250799d453be6215
 
 splits:
   - name: validation

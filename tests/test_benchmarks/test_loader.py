@@ -14,10 +14,12 @@ from vlm_evaluation_harness.benchmarks.schema import (
 )
 
 
-def _hf_manifest(revision: str) -> BenchmarkManifest:
+def _hf_manifest(revision: str, revision_note: str | None = None) -> BenchmarkManifest:
     return BenchmarkManifest(
         name="TestHFBench",
-        source=SourceConfig(type="huggingface", path="org/dataset", revision=revision),
+        source=SourceConfig(
+            type="huggingface", path="org/dataset", revision=revision, revision_note=revision_note
+        ),
         splits=[SplitConfig(name="validation")],
         fields=FieldsConfig(question="question", answer="answer"),
     )
@@ -59,6 +61,19 @@ def test_warns_when_revision_is_unpinned_main(caplog):
 
 def test_no_warning_when_revision_is_pinned(caplog):
     manifest = _hf_manifest(revision="deadbeef")
+    rows = [{"question": "q", "answer": "a"}]
+    fake_load_dataset = MagicMock(return_value=_fake_dataset(rows))
+
+    with patch.dict("sys.modules", {"datasets": MagicMock(load_dataset=fake_load_dataset)}):
+        loader = BenchmarkLoader()
+        with caplog.at_level(logging.WARNING, logger="vlm_evaluation_harness.benchmarks.loader"):
+            list(loader.load(manifest, split="validation"))
+
+    assert not any("not a reproducible pin" in r.message for r in caplog.records)
+
+
+def test_no_warning_when_main_has_a_documented_revision_note(caplog):
+    manifest = _hf_manifest(revision="main", revision_note="gated dataset, pin after auth")
     rows = [{"question": "q", "answer": "a"}]
     fake_load_dataset = MagicMock(return_value=_fake_dataset(rows))
 

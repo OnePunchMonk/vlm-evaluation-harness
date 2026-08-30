@@ -11,6 +11,7 @@ source:
   type: huggingface
   path: HuggingFaceM4/DocVQA
   revision: main
+  revision_note: gated dataset (401 on HF API without auth) -- pin manually after accepting terms and fetching sha via `huggingface-cli` or the datasets API
 
 splits:
   - name: validation

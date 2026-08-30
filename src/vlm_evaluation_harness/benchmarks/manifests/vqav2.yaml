@@ -10,7 +10,7 @@ modality: 2d
 source:
   type: huggingface
   path: HuggingFaceM4/VQAv2
-  revision: main
+  revision: 4b98c864262e9db184eb039e85e97e6630825b6a
 
 splits:
   - name: validation
