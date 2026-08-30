@@ -26,6 +26,13 @@ class BatchGenerateRequest:
     metadata: dict = field(default_factory=dict)
 
 
+# Starting point for batch_size="auto". Deliberately optimistic --
+# generate_batch's OOM backoff halves on the first failure, so a too-high
+# start costs one failed attempt, while a too-low start would silently
+# under-utilize the GPU for the whole run.
+_AUTO_BATCH_START = 32
+
+
 def _is_oom_error(exc: BaseException) -> bool:
     try:
         import torch
@@ -45,7 +52,7 @@ class HuggingFaceAdapter:
         model_id: str,
         device: str = "auto",
         torch_dtype: str = "auto",
-        batch_size: int = 1,
+        batch_size: int | str = 1,
         trust_remote_code: bool = True,
         device_map: str | dict | None = None,
     ):
@@ -72,7 +79,7 @@ class HuggingFaceAdapter:
         dtype = dtype_map.get(torch_dtype, "auto")
 
         self._model_id = model_id
-        self._batch_size = batch_size
+        self._batch_size = _AUTO_BATCH_START if batch_size == "auto" else int(batch_size)
 
         # `device_map` (accelerate-backed sharding across multiple GPUs) takes
         # priority over `device` when explicitly given; `device` alone still

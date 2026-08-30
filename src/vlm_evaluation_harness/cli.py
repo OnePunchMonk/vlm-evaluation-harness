@@ -68,6 +68,13 @@ def eval(
     include_path: list[Path] = typer.Option(
         [], "--include-path", help=_INCLUDE_PATH_HELP
     ),
+    batch_size: str = typer.Option(
+        "1",
+        "--batch-size",
+        help="Samples per generate_batch() call, for adapters that support batching "
+        "(currently HuggingFace only). 'auto' lets the adapter pick its own starting "
+        "size and back off on OOM.",
+    ),
 ):
     """Evaluate a model on one or more benchmarks."""
     from vlm_evaluation_harness.adapters.registry import get_adapter
@@ -78,7 +85,11 @@ def eval(
 
     if include_path:
         get_registry(extra_dirs=include_path)
-    adapter = get_adapter(model)
+
+    parsed_batch_size: int | str = "auto" if batch_size == "auto" else int(batch_size)
+    provider = model.split(":", 1)[0].lower()
+    adapter_kwargs = {"batch_size": parsed_batch_size} if provider in ("huggingface", "hf") else {}
+    adapter = get_adapter(model, **adapter_kwargs)
     runner = EvalRunner(adapter)
     benchmarks = [b.strip() for b in bench.split(",")]
     history = HistoryStore()
@@ -103,6 +114,7 @@ def eval(
             log_samples=log_samples,
             predict_only=predict_only,
             system_prompt_override=system,
+            batch_size=parsed_batch_size,
         )
         result = runner.run(config)
         print_results(result)
