@@ -438,6 +438,12 @@ class EvalRunner:
             return False
         if config.self_consistency_n > 1:
             return False
+        # Interleaved (image_config.placement == "interleaved") prompts carry
+        # per-sample PromptParts that BatchGenerateRequest doesn't have a
+        # field for yet -- fall back rather than silently drop interleaving
+        # order in a batched call.
+        if manifest.image_config.placement == "interleaved":
+            return False
         return True
 
     def _run_batched(
@@ -784,14 +790,20 @@ class EvalRunner:
             if cached_payload is not None:
                 response = VLMResponse.from_cache_payload(cached_payload)
             else:
-                response = self._adapter.generate(
-                    images=formatted.images,
-                    prompt=formatted.text,
-                    system=formatted.system,
-                    history=formatted.history or None,
-                    max_tokens=config.max_tokens,
-                    temperature=config.temperature,
-                )
+                gen_kwargs: dict[str, Any] = {
+                    "images": formatted.images,
+                    "prompt": formatted.text,
+                    "system": formatted.system,
+                    "history": formatted.history or None,
+                    "max_tokens": config.max_tokens,
+                    "temperature": config.temperature,
+                }
+                if formatted.parts:
+                    # Only passed for interleaved-placement manifests, so
+                    # adapters (and test doubles) that don't accept `parts`
+                    # keep working unchanged for every other benchmark.
+                    gen_kwargs["parts"] = formatted.parts
+                response = self._adapter.generate(**gen_kwargs)
                 cache.put(key, self._adapter.model_id, response.to_cache_payload())
             responses.append(response)
             extractions.append(self._extractor.extract(response.text, manifest.answer_extraction))

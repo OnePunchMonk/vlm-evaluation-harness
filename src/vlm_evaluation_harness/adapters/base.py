@@ -115,6 +115,25 @@ class ConversationTurn:
     images: list[Image.Image | str] = field(default_factory=list)
 
 
+@dataclass
+class PromptPart:
+    """One ordered piece of an interleaved prompt: either a text segment or
+    an image, in the sequence they should appear to the model.
+
+    Populated by PromptFormatter.format() only when the benchmark manifest
+    sets image_config.placement == "interleaved" (see benchmarks/schema.py);
+    empty otherwise, in which case adapters fall back to their existing
+    images-then-text (or images-after-text) behavior using `images`/`prompt`
+    directly. An adapter that doesn't understand `parts` can simply ignore
+    it -- this is why it's an addition to generate()'s signature rather than
+    a replacement for `images`/`prompt`.
+    """
+
+    kind: str  # "text" | "image"
+    text: str | None = None
+    image: Image.Image | str | None = None
+
+
 @runtime_checkable
 class VLMAdapter(Protocol):
     """Interface every model backend must implement."""
@@ -127,8 +146,15 @@ class VLMAdapter(Protocol):
         history: list[ConversationTurn] | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.0,
+        parts: list[PromptPart] | None = None,
     ) -> VLMResponse:
-        """Generate a response given images and a text prompt."""
+        """Generate a response given images and a text prompt.
+
+        `parts`, when given, carries the same images/text in the exact
+        interleaved order they should be sent to the model (see PromptPart).
+        Adapters that support genuine interleaving should prefer it over
+        `images`/`prompt` when present; adapters that don't can ignore it.
+        """
         ...
 
     @property
