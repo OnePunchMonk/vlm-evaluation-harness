@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from vlm_evaluation_harness.adapters.base import ConversationTurn, VLMResponse
+from vlm_evaluation_harness.adapters.base import ConversationTurn, PromptPart, VLMResponse
 from vlm_evaluation_harness.pricing import get_pricing
 from vlm_evaluation_harness.retry import with_retries
 
@@ -44,11 +44,27 @@ def _response_text(response) -> str:
     )
 
 
-def _build_messages(
-    images: list, prompt: str, history: list[ConversationTurn] | None
-) -> list[dict]:
+def _build_content(images: list, prompt: str, parts: list[PromptPart] | None) -> list[dict]:
+    """Build one message's `content` array, honoring interleaved ordering
+    when `parts` is given (see PromptPart) and falling back to today's
+    images-then-text otherwise."""
+    if parts:
+        return [
+            {"type": "text", "text": p.text} if p.kind == "text" else _encode_image(p.image)
+            for p in parts
+        ]
     content = [_encode_image(img) for img in images]
     content.append({"type": "text", "text": prompt})
+    return content
+
+
+def _build_messages(
+    images: list,
+    prompt: str,
+    history: list[ConversationTurn] | None,
+    parts: list[PromptPart] | None = None,
+) -> list[dict]:
+    content = _build_content(images, prompt, parts)
 
     messages = []
     for turn in history or []:
@@ -105,12 +121,13 @@ class AnthropicAdapter:
         history: list[ConversationTurn] | None,
         max_tokens: int,
         temperature: float,
+        parts: list[PromptPart] | None = None,
     ) -> dict:
         kwargs: dict = {
             "model": self._model_id,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "messages": _build_messages(images, prompt, history),
+            "messages": _build_messages(images, prompt, history, parts),
         }
         if system:
             kwargs["system"] = system
@@ -124,8 +141,11 @@ class AnthropicAdapter:
         history: list[ConversationTurn] | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.0,
+        parts: list[PromptPart] | None = None,
     ) -> VLMResponse:
-        kwargs = self._request_kwargs(images, prompt, system, history, max_tokens, temperature)
+        kwargs = self._request_kwargs(
+            images, prompt, system, history, max_tokens, temperature, parts
+        )
 
         t0 = time.perf_counter()
         response = with_retries(lambda: self._client.messages.create(**kwargs))
@@ -193,12 +213,13 @@ class AsyncAnthropicAdapter:
         history: list[ConversationTurn] | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.0,
+        parts: list[PromptPart] | None = None,
     ) -> VLMResponse:
         kwargs: dict = {
             "model": self._model_id,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "messages": _build_messages(images, prompt, history),
+            "messages": _build_messages(images, prompt, history, parts),
         }
         if system:
             kwargs["system"] = system

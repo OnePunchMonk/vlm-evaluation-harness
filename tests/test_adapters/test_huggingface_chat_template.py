@@ -8,7 +8,7 @@ test_huggingface_batching.py.
 
 from __future__ import annotations
 
-from vlm_evaluation_harness.adapters.base import ConversationTurn
+from vlm_evaluation_harness.adapters.base import ConversationTurn, PromptPart
 from vlm_evaluation_harness.adapters.huggingface import HuggingFaceAdapter
 
 
@@ -109,3 +109,33 @@ def test_falls_back_cleanly_with_no_system_and_no_history():
 
     assert text == "1+1?"
     assert images == []
+
+
+def test_prompt_parts_override_content_order_in_chat_template():
+    """When `prompt_parts` is given, the user message's content must follow
+    that order instead of the default images-then-text -- and `images`
+    should be ignored in favor of the images embedded in the parts."""
+    processor = _FakeProcessorWithTemplate()
+    adapter = _make_adapter(processor)
+
+    prompt_parts = [
+        PromptPart(kind="text", text="Compare"),
+        PromptPart(kind="image", image="a.png"),
+        PromptPart(kind="text", text="to"),
+        PromptPart(kind="image", image="b.png"),
+        PromptPart(kind="text", text="Which is bigger?"),
+    ]
+
+    text, images = adapter._render_prompt(
+        images=["ignored.png"],
+        prompt="ignored prompt",
+        system=None,
+        history=None,
+        prompt_parts=prompt_parts,
+    )
+
+    user_content = processor.captured_messages[-1]["content"]
+    assert [c["type"] for c in user_content] == ["text", "image", "text", "image", "text"]
+    assert user_content[0]["text"] == "Compare"
+    assert user_content[4]["text"] == "Which is bigger?"
+    assert images == ["a.png", "b.png"]

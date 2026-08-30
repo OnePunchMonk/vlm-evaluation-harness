@@ -58,6 +58,7 @@ class MockAdapter:
         history: list[ConversationTurn] | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.0,
+        parts: list | None = None,  # accepted for protocol compat; unused
     ) -> VLMResponse:
         self.last_system = system
         t0 = time.perf_counter()

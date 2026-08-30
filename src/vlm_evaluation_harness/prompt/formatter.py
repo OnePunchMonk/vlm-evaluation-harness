@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
 import string
 from dataclasses import dataclass, field
 from typing import Any
 
 from PIL import Image
 
-from vlm_evaluation_harness.adapters.base import ConversationTurn
+from vlm_evaluation_harness.adapters.base import ConversationTurn, PromptPart
 from vlm_evaluation_harness.benchmarks.schema import BenchmarkManifest
 
 
@@ -34,9 +35,19 @@ class FormattedPrompt:
     # turn pair per few-shot example, meant to be passed as `history=` to
     # VLMAdapter.generate() instead of being flattened into `text`.
     history: list[ConversationTurn] = field(default_factory=list)
+    # Populated only when image_config.placement == "interleaved": the same
+    # images and text as `images`/`text`, but ordered exactly as the prompt
+    # template's `{image_1}`, `{image_2}`, ... placeholders positioned them.
+    # See PromptPart. Empty otherwise.
+    parts: list[PromptPart] = field(default_factory=list)
 
 
 _CHOICE_LETTERS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+# Placeholder substituted for {image_N} during rendering, then located again
+# in the rendered text to split it into ordered PromptParts. NUL-delimited
+# so it can't collide with anything a real prompt template would contain.
+_IMAGE_MARKER = "\x00IMG{}\x00"
+_IMAGE_MARKER_RE = re.compile(r"\x00IMG(\d+)\x00")
 
 
 class PromptFormatter:
@@ -68,13 +79,52 @@ class PromptFormatter:
             self._render_few_shot_turns(few_shot_examples, manifest) if multi_turn else []
         )
 
+        interleaved = manifest.image_config.placement == "interleaved" and bool(sample_images)
+        if interleaved:
+            for i in range(1, len(sample_images) + 1):
+                variables[f"image_{i}"] = _IMAGE_MARKER.format(i)
+
+        rendered = self._render(template or manifest.prompt_template, variables)
+
+        parts: list[PromptPart] = []
+        text = rendered.strip()
+        if interleaved:
+            parts = self._split_into_parts(rendered, sample_images)
+            if not any(p.kind == "image" for p in parts):
+                raise PromptFormatError(
+                    f"benchmark '{manifest.name}' sets image_config.placement='interleaved' "
+                    "and has images, but its prompt_template contains no {image_N} "
+                    "placeholder -- every image would be silently dropped."
+                )
+            text = _IMAGE_MARKER_RE.sub("", rendered)
+            text = re.sub(r"[ \t]+", " ", text)
+            text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
         return FormattedPrompt(
-            text=self._render(template or manifest.prompt_template, variables).strip(),
+            text=text,
             images=sample_images,
             system=manifest.system_prompt,
             raw_fields=variables,
             history=history,
+            parts=parts,
         )
+
+    def _split_into_parts(self, rendered: str, images: list[Image.Image | str]) -> list[PromptPart]:
+        """Split text containing `_IMAGE_MARKER`s into ordered PromptParts."""
+        parts: list[PromptPart] = []
+        cursor = 0
+        for m in _IMAGE_MARKER_RE.finditer(rendered):
+            segment = rendered[cursor : m.start()]
+            if segment.strip():
+                parts.append(PromptPart(kind="text", text=segment))
+            index = int(m.group(1))
+            if 1 <= index <= len(images):
+                parts.append(PromptPart(kind="image", image=images[index - 1]))
+            cursor = m.end()
+        tail = rendered[cursor:]
+        if tail.strip():
+            parts.append(PromptPart(kind="text", text=tail))
+        return parts
 
     def _render(self, template: str, variables: dict[str, Any]) -> str:
         required = {

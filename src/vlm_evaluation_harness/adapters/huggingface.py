@@ -138,6 +138,7 @@ class HuggingFaceAdapter:
         prompt: str,
         system: str | None,
         history: list[ConversationTurn] | None,
+        prompt_parts: list | None = None,
     ) -> tuple[str, list]:
         """Render (system, history, prompt) into model input text.
 
@@ -149,6 +150,15 @@ class HuggingFaceAdapter:
         available. Either way, `history` (e.g. multi-turn few-shot examples)
         is now actually included — previously it was accepted as a parameter
         here and silently dropped.
+
+        `prompt_parts` (a list of PromptPart, see adapters/base.py), when
+        given, is only consulted for the user message's content when a chat
+        template is available -- it carries the exact interleaved order
+        images should appear relative to the prompt text, in place of the
+        images-then-text order `images`/`prompt` would otherwise produce.
+        The plain-concatenation fallback below ignores it: without a chat
+        template there's no per-image markup to interleave into, so images
+        still all attach as a flat block regardless.
         """
         apply_chat_template = getattr(self._processor, "apply_chat_template", None)
         tokenizer = getattr(self._processor, "tokenizer", None)
@@ -168,10 +178,19 @@ class HuggingFaceAdapter:
                 content.append({"type": "text", "text": turn.text})
                 messages.append({"role": turn.role, "content": content})
                 all_images.extend(turn.images)
-            content = [{"type": "image"} for _ in images]
-            content.append({"type": "text", "text": prompt})
+            if prompt_parts:
+                content = []
+                for p in prompt_parts:
+                    if p.kind == "image":
+                        content.append({"type": "image"})
+                        all_images.append(p.image)
+                    else:
+                        content.append({"type": "text", "text": p.text})
+            else:
+                content = [{"type": "image"} for _ in images]
+                content.append({"type": "text", "text": prompt})
+                all_images.extend(images)
             messages.append({"role": "user", "content": content})
-            all_images.extend(images)
             text = apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
             return text, all_images
 
@@ -193,10 +212,11 @@ class HuggingFaceAdapter:
         history: list[ConversationTurn] | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.0,
+        parts: list | None = None,
     ) -> VLMResponse:
         import torch
 
-        full_prompt, all_images = self._render_prompt(images, prompt, system, history)
+        full_prompt, all_images = self._render_prompt(images, prompt, system, history, parts)
         pil_images = [
             Image.open(img) if isinstance(img, str) else img for img in all_images
         ]
