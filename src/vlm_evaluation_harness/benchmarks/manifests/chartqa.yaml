@@ -10,7 +10,7 @@ modality: 2d
 source:
   type: huggingface
   path: HuggingFaceM4/ChartQA
-  revision: main
+  revision: b605b6e08b57faf4359aeb2fe6a3ca595f99b6c5
 
 splits:
   - name: test

@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      - name: Check dataset revisions are pinned
+        run: python scripts/check_pinned_revisions.py
+
       - name: Lint
         run: ruff check .
 

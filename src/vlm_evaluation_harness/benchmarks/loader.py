@@ -121,12 +121,13 @@ class BenchmarkLoader:
             raise ImportError("pip install datasets")
 
         src = manifest.source
-        if src.revision == "main":
+        if src.revision == "main" and not src.revision_note:
             logger.warning(
                 "benchmark '%s' loads huggingface dataset '%s' at revision 'main' — "
                 "a floating pointer, not a reproducible pin. Set source.revision to a "
                 "commit SHA or tag in the manifest so results stay reproducible if the "
-                "dataset is updated upstream.",
+                "dataset is updated upstream. If it can't be pinned yet (e.g. a gated "
+                "dataset), set source.revision_note to say why.",
                 manifest.name,
                 src.path,
             )
