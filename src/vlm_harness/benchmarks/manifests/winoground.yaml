@@ -11,7 +11,7 @@ modality: cross_modal
 source:
   type: huggingface
   path: facebook/winoground
-  revision: main
+  revision: b400e173549071916ad1b3d449293bc8d8b4b763
 
 splits:
   - name: test

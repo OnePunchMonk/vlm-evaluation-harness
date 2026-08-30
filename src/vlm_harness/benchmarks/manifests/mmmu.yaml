@@ -10,7 +10,7 @@ modality: 2d
 source:
   type: huggingface
   path: MMMU/MMMU
-  revision: main
+  revision: 98e6ac0cb9b7b2cd2c991b85a50762edc4aedc68
 
 splits:
   - name: validation
