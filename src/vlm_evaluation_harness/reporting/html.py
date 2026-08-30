@@ -1,8 +1,8 @@
 """Self-contained HTML report generator.
 
 Builds a leaderboard across (model, benchmark, metric) plus an optional
-regression section, styled after the vlm_regcheck/ prototype in this repo.
-Works on plain dicts (as produced by EvalResult.to_dict() / GenEvalResult.to_dict()
+regression section. Works on plain dicts (as produced by
+EvalResult.to_dict() / GenEvalResult.to_dict()
 or loaded back from saved *_results.json files) so it doesn't care whether
 the runs were discriminative or generative.
 """
