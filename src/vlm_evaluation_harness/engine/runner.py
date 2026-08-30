@@ -70,6 +70,15 @@ class EvalConfig:
     split: str = "validation"
     max_samples: int | None = None
     max_concurrent: int = 1
+    # 1 (default) = today's per-sample generate() loop, unchanged. An int > 1
+    # routes through adapter.generate_batch() in chunks of that size; "auto"
+    # lets the adapter pick its own starting batch size (HuggingFaceAdapter
+    # starts optimistic and backs off on OOM). Only takes effect when the
+    # adapter reports supports_batch_inference and the run doesn't need
+    # per-sample control flow the batched path doesn't implement (pairwise
+    # matching, loglikelihood scoring, self-consistency voting) -- those
+    # silently fall back to the per-sample path regardless of this setting.
+    batch_size: int | str = 1
     temperature: float = 0.0
     max_tokens: int = 1024
     output_dir: Path | None = None
@@ -269,7 +278,10 @@ class EvalRunner:
         started_at = datetime.now(timezone.utc).isoformat()
 
         try:
-            sample_results = self._run_all(samples, manifest, config, cache, few_shot)
+            if self._can_run_batched(manifest, config):
+                sample_results = self._run_batched(samples, manifest, config, cache, few_shot)
+            else:
+                sample_results = self._run_all(samples, manifest, config, cache, few_shot)
         finally:
             cache.close()
 
@@ -402,6 +414,182 @@ class EvalRunner:
             fields["images"] = ex.images
             rendered.append(fields)
         return rendered
+
+    # Runner-level chunk size used for batch_size="auto" -- the adapter picks
+    # its own internal starting batch size and backs off on OOM, but the
+    # runner still needs *some* chunk boundary so a non-OOM failure in one
+    # generate_batch() call doesn't mark an unbounded number of samples
+    # errored (see _run_batched).
+    _AUTO_BATCH_RUNNER_CHUNK = 16
+
+    def _can_run_batched(self, manifest: BenchmarkManifest, config: EvalConfig) -> bool:
+        if config.batch_size == 1:
+            return False
+        if not getattr(self._adapter, "supports_batch_inference", False):
+            return False
+        if not hasattr(self._adapter, "generate_batch"):
+            return False
+        # These all need per-sample control flow (two prompts per sample,
+        # exact log-likelihood scoring, N-way voting) that the batched path
+        # below doesn't implement -- fall back rather than get it wrong.
+        if manifest.task_type == "pairwise_matching":
+            return False
+        if manifest.scoring == "loglikelihood":
+            return False
+        if config.self_consistency_n > 1:
+            return False
+        return True
+
+    def _run_batched(
+        self,
+        samples: list[BenchmarkSample],
+        manifest: BenchmarkManifest,
+        config: EvalConfig,
+        cache: ResponseCache,
+        few_shot: list[dict],
+    ) -> list[SampleResult]:
+        """Batched counterpart to `_run_all`, used when `_can_run_batched`
+        says the run is a plain single-shot generate() eval the adapter can
+        batch.
+
+        Trades away `_run_all`'s per-sample error isolation: a non-OOM
+        exception from one `generate_batch()` call marks every sample in
+        that runner-level chunk as errored, not just the one that triggered
+        it (an OOM is not this -- the adapter already backs off and retries
+        internally, invisibly to the runner). Chunk size is `config.batch_size`
+        when it's a concrete int, or `_AUTO_BATCH_RUNNER_CHUNK` under
+        batch_size="auto", so that blast radius stays bounded either way.
+        """
+        from vlm_evaluation_harness.adapters.huggingface import BatchGenerateRequest
+
+        prepared = []
+        for sample in tqdm(samples, desc=f"Preparing {manifest.name}"):
+            try:
+                processed = self._image_pipeline.process_batch(sample.images)
+                images = [p.image for p in processed]
+                image_hashes = [p.hash for p in processed]
+                if config.robustness_corruptions:
+                    images = [self._corrupt(img, config) for img in images]
+                    image_hashes = [
+                        f"{h}+{'+'.join(config.robustness_corruptions)}"
+                        f"@{config.corruption_severity}"
+                        for h in image_hashes
+                    ]
+
+                formatted = self._formatter.format(
+                    manifest, images, sample.text_fields, few_shot_examples=few_shot, template=None
+                )
+                if config.system_prompt_override is not None:
+                    formatted.system = config.system_prompt_override
+
+                params = {
+                    "max_tokens": config.max_tokens,
+                    "temperature": config.temperature,
+                    "mode": "generate",
+                }
+                if formatted.history:
+                    params["history"] = [(t.role, t.text) for t in formatted.history]
+                key = response_key(
+                    self._adapter.model_id, formatted.text, formatted.system, image_hashes, params
+                )
+                cached_payload = cache.get(key)
+                prepared.append(
+                    {
+                        "sample": sample,
+                        "formatted": formatted,
+                        "image_hashes": image_hashes,
+                        "key": key,
+                        "response": (
+                            VLMResponse.from_cache_payload(cached_payload)
+                            if cached_payload is not None
+                            else None
+                        ),
+                        "error": None,
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001 - recorded per sample
+                prepared.append(
+                    {
+                        "sample": sample,
+                        "formatted": None,
+                        "image_hashes": [],
+                        "key": None,
+                        "response": None,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                )
+
+        to_generate = [p for p in prepared if p["error"] is None and p["response"] is None]
+        chunk_size = (
+            config.batch_size
+            if isinstance(config.batch_size, int) and config.batch_size > 0
+            else self._AUTO_BATCH_RUNNER_CHUNK
+        )
+
+        for start in tqdm(
+            range(0, len(to_generate), chunk_size), desc=f"Evaluating {manifest.name}"
+        ):
+            chunk = to_generate[start : start + chunk_size]
+            requests = [
+                BatchGenerateRequest(
+                    images=p["formatted"].images,
+                    prompt=p["formatted"].text,
+                    system=p["formatted"].system,
+                    history=p["formatted"].history or None,
+                    max_tokens=config.max_tokens,
+                    temperature=config.temperature,
+                )
+                for p in chunk
+            ]
+            try:
+                responses = self._adapter.generate_batch(requests)
+            except Exception as exc:  # noqa: BLE001 - whole chunk marked errored
+                for p in chunk:
+                    p["error"] = f"{type(exc).__name__}: {exc}"
+                continue
+            for p, response in zip(chunk, responses):
+                cache.put(p["key"], self._adapter.model_id, response.to_cache_payload())
+                p["response"] = response
+
+        results: list[SampleResult] = []
+        for p in prepared:
+            sample = p["sample"]
+            if p["error"] is not None:
+                results.append(
+                    SampleResult(
+                        sample_id=sample.sample_id,
+                        prediction="",
+                        references=sample.references,
+                        raw_output="",
+                        confident=False,
+                        input_tokens=0,
+                        output_tokens=0,
+                        latency_ms=0.0,
+                        cached=False,
+                        image_hashes=[],
+                        metadata=sample.metadata,
+                        error=p["error"],
+                    )
+                )
+                continue
+            response = p["response"]
+            extraction = self._extractor.extract(response.text, manifest.answer_extraction)
+            results.append(
+                SampleResult(
+                    sample_id=sample.sample_id,
+                    prediction=extraction.normalized,
+                    references=self._normalize_references(sample.references, manifest),
+                    raw_output=response.text,
+                    confident=extraction.confident,
+                    input_tokens=response.input_tokens,
+                    output_tokens=response.output_tokens,
+                    latency_ms=response.latency_ms,
+                    cached=response.cached,
+                    image_hashes=p["image_hashes"],
+                    metadata=sample.metadata,
+                )
+            )
+        return results
 
     def _run_all(
         self,
