@@ -8,6 +8,28 @@ from PIL import Image
 
 from vlm_harness.adapters.base import ConversationTurn, VLMResponse
 
+# Starting point for batch-size == "auto" probing. Deliberately optimistic --
+# generate_auto_batch halves on the first OOM, so a too-high start just costs
+# one failed attempt, while a too-low start would silently under-utilize the
+# GPU for the whole run.
+_AUTO_BATCH_START = 32
+
+
+def _is_oom_error(exc: Exception) -> bool:
+    """True for a CUDA/accelerator out-of-memory error, cheaply and without
+    a hard torch import (torch's own OutOfMemoryError subclasses RuntimeError,
+    but so does everything else CUDA raises -- so also pattern-match the
+    message, matching torch's own convention of putting "out of memory" in
+    it)."""
+    try:
+        import torch
+
+        if isinstance(exc, torch.cuda.OutOfMemoryError):
+            return True
+    except ImportError:
+        pass
+    return isinstance(exc, RuntimeError) and "out of memory" in str(exc).lower()
+
 
 class HuggingFaceAdapter:
     """Adapter for local models via HuggingFace Transformers."""
@@ -17,7 +39,7 @@ class HuggingFaceAdapter:
         model_id: str,
         device: str = "auto",
         torch_dtype: str = "auto",
-        batch_size: int = 1,
+        batch_size: int | str = 1,
         trust_remote_code: bool = True,
     ):
         try:
@@ -43,7 +65,10 @@ class HuggingFaceAdapter:
         dtype = dtype_map.get(torch_dtype, "auto")
 
         self._model_id = model_id
-        self._batch_size = batch_size
+        # "auto" starts optimistic and halves on OOM (see generate_auto_batch);
+        # an explicit int is used as-is and never adjusted.
+        self._auto_batch_size = batch_size == "auto"
+        self._batch_size = _AUTO_BATCH_START if self._auto_batch_size else int(batch_size)
 
         self._processor = AutoProcessor.from_pretrained(
             model_id, trust_remote_code=trust_remote_code
@@ -198,3 +223,41 @@ class HuggingFaceAdapter:
                 )
             )
         return responses
+
+    def generate_auto_batch(
+        self,
+        requests: list[dict],
+        max_tokens: int = 1024,
+        temperature: float = 0.0,
+    ) -> list[VLMResponse]:
+        """Run `requests` through generate_batch(), sized to fit GPU memory.
+
+        Starts at self._batch_size (32 when batch_size="auto", otherwise the
+        configured size) and, on OOM, clears the CUDA cache and progressively
+        halves the batch size until a chunk fits or the floor of 1 is hit (a
+        floor-1 OOM propagates -- a single sample not fitting isn't a batch
+        sizing problem). Once reduced, self._batch_size stays reduced for the
+        rest of this adapter's life; it never grows back, since re-probing
+        upward risks repeatedly re-triggering the OOM it just backed off
+        from.
+        """
+        results: list[VLMResponse] = []
+        i = 0
+        while i < len(requests):
+            chunk = requests[i : i + self._batch_size]
+            try:
+                results.extend(
+                    self.generate_batch(chunk, max_tokens=max_tokens, temperature=temperature)
+                )
+                i += len(chunk)
+            except Exception as exc:
+                if not _is_oom_error(exc) or self._batch_size <= 1:
+                    raise
+                try:
+                    import torch
+
+                    torch.cuda.empty_cache()
+                except ImportError:
+                    pass
+                self._batch_size = max(1, self._batch_size // 2)
+        return results

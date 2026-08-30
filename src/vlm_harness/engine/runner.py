@@ -36,6 +36,12 @@ class EvalConfig:
     output_dir: Path | None = None
     robustness_corruptions: list[str] = field(default_factory=list)
     seed: int = 42
+    # 1 = the original per-sample generate() loop. An int > 1 batches that
+    # many samples per adapter.generate_batch() call. "auto" batches via
+    # adapter.generate_auto_batch() (currently only HuggingFaceAdapter
+    # implements it), which backs off the batch size on GPU OOM. Ignored
+    # for adapters that don't implement generate_batch.
+    batch_size: int | str = 1
 
 
 @dataclass
@@ -138,11 +144,14 @@ class EvalRunner:
         )
 
         started_at = datetime.now(timezone.utc).isoformat()
-        sample_results: list[SampleResult] = []
 
-        for sample in tqdm(samples, desc=f"Evaluating {manifest.name}"):
-            sample_result = self._eval_sample(sample, manifest, config, cost_tracker)
-            sample_results.append(sample_result)
+        if config.batch_size != 1 and hasattr(self._adapter, "generate_batch"):
+            sample_results = self._run_batched(samples, manifest, config, cost_tracker)
+        else:
+            sample_results = [
+                self._eval_sample(sample, manifest, config, cost_tracker)
+                for sample in tqdm(samples, desc=f"Evaluating {manifest.name}")
+            ]
 
         finished_at = datetime.now(timezone.utc).isoformat()
 
@@ -169,34 +178,24 @@ class EvalRunner:
 
         return result
 
-    def _eval_sample(
-        self,
-        sample: BenchmarkSample,
-        manifest: BenchmarkManifest,
-        config: EvalConfig,
-        cost_tracker: CostTracker,
-    ) -> SampleResult:
-        # Process images
+    def _prepare_sample(self, sample: BenchmarkSample, manifest: BenchmarkManifest):
+        """Image processing + prompt formatting shared by both eval paths."""
         processed = self._image_pipeline.process_batch(sample.images)
         images: list[Image.Image | str] = [p.image for p in processed]
         image_hashes = [p.hash for p in processed]
-
-        # Format prompt
         formatted = self._formatter.format(manifest, images, sample.text_fields)
+        return formatted, image_hashes
 
-        # Generate
-        response = self._adapter.generate(
-            images=formatted.images,
-            prompt=formatted.text,
-            system=formatted.system,
-            max_tokens=config.max_tokens,
-            temperature=config.temperature,
-        )
+    def _finalize_sample(
+        self,
+        sample: BenchmarkSample,
+        manifest: BenchmarkManifest,
+        response,
+        image_hashes: list[str],
+        cost_tracker: CostTracker,
+    ) -> SampleResult:
         cost_tracker.record(response)
-
-        # Extract answer
         extraction = self._extractor.extract(response.text, manifest.answer_extraction)
-
         return SampleResult(
             sample_id=sample.sample_id,
             prediction=extraction.normalized,
@@ -209,3 +208,57 @@ class EvalRunner:
             image_hashes=image_hashes,
             metadata=sample.metadata,
         )
+
+    def _eval_sample(
+        self,
+        sample: BenchmarkSample,
+        manifest: BenchmarkManifest,
+        config: EvalConfig,
+        cost_tracker: CostTracker,
+    ) -> SampleResult:
+        formatted, image_hashes = self._prepare_sample(sample, manifest)
+        response = self._adapter.generate(
+            images=formatted.images,
+            prompt=formatted.text,
+            system=formatted.system,
+            max_tokens=config.max_tokens,
+            temperature=config.temperature,
+        )
+        return self._finalize_sample(sample, manifest, response, image_hashes, cost_tracker)
+
+    def _run_batched(
+        self,
+        samples: list[BenchmarkSample],
+        manifest: BenchmarkManifest,
+        config: EvalConfig,
+        cost_tracker: CostTracker,
+    ) -> list[SampleResult]:
+        prepared = [self._prepare_sample(sample, manifest) for sample in samples]
+        requests = [
+            {"images": formatted.images, "prompt": formatted.text, "system": formatted.system}
+            for formatted, _ in prepared
+        ]
+
+        if config.batch_size == "auto" and hasattr(self._adapter, "generate_auto_batch"):
+            auto_batch = self._adapter.generate_auto_batch  # type: ignore[attr-defined]
+            responses = auto_batch(
+                requests, max_tokens=config.max_tokens, temperature=config.temperature
+            )
+        else:
+            generate_batch = self._adapter.generate_batch  # type: ignore[attr-defined]
+            chunk_size = int(config.batch_size) if config.batch_size != "auto" else len(requests)
+            responses = []
+            for start in tqdm(
+                range(0, len(requests), chunk_size), desc=f"Evaluating {manifest.name}"
+            ):
+                chunk = requests[start : start + chunk_size]
+                responses.extend(
+                    generate_batch(
+                        chunk, max_tokens=config.max_tokens, temperature=config.temperature
+                    )
+                )
+
+        return [
+            self._finalize_sample(sample, manifest, response, image_hashes, cost_tracker)
+            for sample, (_, image_hashes), response in zip(samples, prepared, responses)
+        ]

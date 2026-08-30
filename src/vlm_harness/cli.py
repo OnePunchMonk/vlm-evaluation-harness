@@ -26,6 +26,12 @@ def eval(
     output_dir: Path | None = typer.Option(None, "--output-dir", "-o"),
     robustness: str | None = typer.Option(None, "--corruptions", help="Comma-sep corruptions"),
     track: bool = typer.Option(True, "--track/--no-track", help="Record this run to local history"),
+    batch_size: str = typer.Option(
+        "1",
+        "--batch-size",
+        help="Samples per generate_batch() call. 'auto' probes GPU memory and "
+        "backs off on OOM (HuggingFace adapter only).",
+    ),
 ):
     """Evaluate a model on one or more benchmarks."""
     from vlm_harness.adapters.registry import get_adapter
@@ -33,7 +39,11 @@ def eval(
     from vlm_harness.reporting.terminal import print_results
     from vlm_harness.tracking import HistoryStore
 
-    adapter = get_adapter(model)
+    parsed_batch_size: int | str = "auto" if batch_size == "auto" else int(batch_size)
+
+    provider = model.split(":", 1)[0].lower()
+    adapter_kwargs = {"batch_size": parsed_batch_size} if provider in ("huggingface", "hf") else {}
+    adapter = get_adapter(model, **adapter_kwargs)
     runner = EvalRunner(adapter)
     benchmarks = [b.strip() for b in bench.split(",")]
     history = HistoryStore()
@@ -48,6 +58,7 @@ def eval(
             temperature=temperature,
             output_dir=output_dir,
             robustness_corruptions=[c.strip() for c in robustness.split(",")] if robustness else [],
+            batch_size=parsed_batch_size,
         )
         result = runner.run(config)
         print_results(result)
