@@ -73,6 +73,7 @@ def _ensure_builtins_loaded() -> None:
         glimpseprune,
         learnpruner,
         prumerge,
+        queryaware,
         random,
         topv,
         viscache,

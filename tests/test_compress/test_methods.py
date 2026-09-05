@@ -25,6 +25,7 @@ def test_all_ten_methods_registered():
         "glimpseprune",
         "flashvlm",
         "erase",
+        "queryaware",
     }
 
 
