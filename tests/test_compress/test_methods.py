@@ -23,6 +23,7 @@ def test_all_ten_methods_registered():
         "viscache",
         "aim",
         "glimpseprune",
+        "queryaware",
     }
 
 
