@@ -55,7 +55,7 @@ all = [
 vlm-evaluation-harness = "vlm_evaluation_harness.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/vlm_evaluation_harness"]
+packages = ["src/vlm_evaluation_harness", "src/vlm_compress"]
 
 [tool.ruff]
 src = ["src"]
