@@ -67,7 +67,9 @@ def _ensure_builtins_loaded() -> None:
     from vlm_compress.methods import (  # noqa: F401
         aim,
         dart,
+        erase,
         fastv,
+        flashvlm,
         glimpseprune,
         learnpruner,
         prumerge,
