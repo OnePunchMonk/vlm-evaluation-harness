@@ -64,6 +64,17 @@ def _ensure_builtins_loaded() -> None:
     global _builtins_loaded
     if _builtins_loaded:
         return
-    from vlm_compress.methods import fastv, random  # noqa: F401
+    from vlm_compress.methods import (  # noqa: F401
+        aim,
+        dart,
+        fastv,
+        glimpseprune,
+        learnpruner,
+        prumerge,
+        random,
+        topv,
+        viscache,
+        vispruner,
+    )
 
     _builtins_loaded = True
